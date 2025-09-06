@@ -1,0 +1,103 @@
+# 敏感資訊和API金鑰
+*.key
+*.pem
+.env*
+config/secrets.json
+credentials.json
+service-account-key.json
+line-bot-config.json
+openai-api-key.txt
+openai-config.json
+gcp-key.json
+google-credentials.json
+
+# 個資相關檔案
+申請表模板.docx
+申請表模板.doc
+templates/*.docx
+templates/*.doc
+
+# 影片和圖片檔案
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wmv
+*.flv
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.svg
+*.webp
+*.ico
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.cursor/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# 系統檔案
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 測試和開發
+test-data/
+test-uploads/
+test-results/
+*.test.json
+logs/
+*.log
+tmp/
+temp/
+cache/
+
+# Google Cloud
+.gcloud/
+
+# 備份檔案
+*.bak
+*.backup
+*~
