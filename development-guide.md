@@ -29,10 +29,9 @@
 #### 📁 本地備份檔案結構
 ```
 code/gas/
-├── Code.js                 # Code.gs 備份 [Phase 1]
-├── LineHandler.js          # LineHandler.gs 備份 [Phase 1]
-├── Config.js               # Config.gs 備份（與GAS相同，透過git ignore保護）[Phase 1]
-├── Config.js.example       # 設定檔範例（可進git）[Phase 1]
+├── Code.js                 # Code.gs 備份 [Phase 1] ✅
+├── LineHandler.js          # LineHandler.gs 備份 [Phase 1] ✅
+├── Config.js               # Config.gs 備份（與GAS相同，透過git ignore保護）[Phase 1] ✅
 ├── OpenAIHandler.js        # OpenAIHandler.gs 備份 [Phase 2]
 ├── DateUtils.js            # DateUtils.gs 備份 [Phase 3]
 ├── SheetsHandler.js        # SheetsHandler.gs 備份 [Phase 4]
@@ -46,10 +45,9 @@ code/gas/
 - `Config.gs` - 設定和常數
 
 **本地備份**：
-- `code/gas/Code.js` - 與GAS相同
-- `code/gas/LineHandler.js` - 與GAS相同
-- `code/gas/Config.js` - 與GAS相同（透過git ignore保護）
-- `code/gas/Config.js.example` - 設定檔範例（可進git）
+- `code/gas/Code.js` - 與GAS相同 ✅
+- `code/gas/LineHandler.js` - 與GAS相同 ✅
+- `code/gas/Config.js` - 與GAS相同（透過git ignore保護）✅
 
 #### 1.1 LINE Bot基本設置 ✅ **已完成**
 - [x] 建立LINE Developer帳號和Bot
@@ -72,63 +70,193 @@ code/gas/
 
 #### 1.3 階段測試里程碑 ✅ **已完成**
 - [x] ✅ 能接收訊息並正確回覆（個人聊天測試完成）
-- [x] ✅ 群組成員都能看到Bot互動（群組測試待完成）
+- [x] ✅ 群組成員都能看到Bot互動（群組測試完成）
 - [x] ✅ 基本錯誤處理（訊息格式錯誤等）
 - [x] ✅ 日誌正確記錄所有互動
 - [x] ✅ PropertiesService正確存取API Keys
 
-#### 🎯 Phase 1 預期產出
+#### 🎯 Phase 1 預期產出 ✅ **已完成**
 **程式碼檔案**：
-- 3個GAS檔案（Code.gs, LineHandler.gs, Config.gs）
-- 本地備份的3個.js檔案（Code.js, LineHandler.js, Config.js）
+- 3個GAS檔案（Code.gs, LineHandler.gs, Config.gs）✅
+- 本地備份的3個.js檔案（Code.js, LineHandler.js, Config.js）✅
 
 **Config.js 用途說明**：
-- 存放非敏感設定：系統常數、錯誤訊息模板、業務邏輯設定
-- 提供取得敏感資訊的方法：透過 PropertiesService 存取 API Keys
-- 敏感資訊（API Keys）存放在 GAS PropertiesService，不在程式碼中
+- 存放非敏感設定：系統常數、錯誤訊息模板、業務邏輯設定 ✅
+- 提供取得敏感資訊的方法：透過 PropertiesService 存取 API Keys ✅
+- 敏感資訊（API Keys）存放在 GAS PropertiesService，不在程式碼中 ✅
 
 **設定檔案**：
-- LINE Bot設定資訊記錄
-- GAS部署資訊記錄
+- LINE Bot設定資訊記錄 ✅
+- GAS部署資訊記錄 ✅
 
 **測試結果**：
-- 完整的測試記錄和問題解決方案
+- 完整的測試記錄和問題解決方案 ✅
 
-### Phase 2: AI語意解析整合 (1-2週)
-#### 2.1 OpenAI API整合
-- [ ] 申請OpenAI API金鑰並設定額度控制
-- [ ] 在GAS中實現API調用邏輯
-- [ ] 實現語音錯誤修正功能
+### Phase 2: AI語意解析整合 (1-2週) ✅ **已完成**
 
-#### 2.2 核心指令處理
-- [ ] 實現「申請」指令識別（含語音錯誤）
-- [ ] 建立信心度評分和確認機制
-- [ ] 實現意圖識別（申請、確認、修改）
-- [ ] 建立降級機制（關鍵字備案）
+#### 📋 Phase 2 範疇定義
+**Phase 2 專注於**：
+- **語音錯誤修正**：處理盲人語音輸入的常見錯誤（如「時」→「十」、「藥申請」→「申請」）
+- **基本意圖識別**：識別用戶想做什麼（申請、測試、幫助）
+- **信心度評分**：判斷AI理解的準確度
+- **降級機制**：API失敗時的關鍵字備案
 
-#### 2.3 階段測試里程碑
-- [ ] ✅ 正確識別「申請」指令（包含「藥申請」等錯誤）
-- [ ] ✅ 信心度低時能要求用戶澄清
-- [ ] ✅ API失敗時能降級到關鍵字匹配
+**Phase 2 不處理**：
+- ❌ 複雜的確認邏輯（留給 Phase 3 的狀態管理）
+- ❌ 日期時間處理（Phase 3）
+- ❌ 業務邏輯（Phase 3-5）
+- ❌ 多輪對話（Phase 3）
 
-### Phase 3: 時間和日期邏輯 (1週)
-#### 3.1 時間窗口管理
+#### 🎯 Phase 2 開發決策
+- **OpenAI 模型**：gpt-4o-mini（成本低，性能足夠語音處理需求）
+- **API 調用參數**：
+  - Temperature: 0.1（低創造性，提高準確性）
+  - Max Tokens: 300（夠用且省成本）
+  - Timeout: 10秒
+  - Retry: 2次
+- **成本控制**：每月調用上限3000次，預估成本約台幣15-30元
+- **API Key 存放**：PropertiesService 屬性名稱 `OPENAI_API_KEY`
+- **信心度門檻**：
+  - 高信心度 (≥0.9)：直接執行（提高準確性要求）
+  - 中信心度 (0.7-0.9)：請用戶確認（提高準確性要求）
+  - 低信心度 (<0.7)：請用戶重新表達
+
+#### 🎯 Phase 2 需要建立的檔案 ✅ **已完成**
+**GAS專案中新增**：
+- `OpenAIHandler.gs` - OpenAI API 處理邏輯 ✅
+
+**本地備份新增**：
+- `code/gas/OpenAIHandler.js` - 與GAS相同內容 ✅
+
+**現有檔案修改**：
+- `Config.gs/Config.js` - 新增 OpenAI 相關設定 ✅
+- `Code.gs/Code.js` - 整合 OpenAI 處理邏輯 ✅
+
+#### 2.1 OpenAI API整合 ✅ **已完成**
+- [x] 申請OpenAI API金鑰並設定額度控制
+- [x] 在GAS中實現API調用邏輯
+- [x] 實現語音錯誤修正功能
+
+#### 2.2 核心指令處理 ✅ **已完成**
+- [x] 實現「申請」指令識別（含語音錯誤）
+- [x] 建立信心度評分和確認機制
+- [x] 實現意圖識別（申請、確認、修改）
+- [x] 建立降級機制（關鍵字備案）
+
+#### 2.3 階段測試里程碑 ✅ **已完成**
+- [x] ✅ 正確識別「申請」指令（包含「藥申請」等錯誤）
+- [x] ✅ 信心度低時能要求用戶澄清
+- [x] ✅ API失敗時能降級到關鍵字匹配
+
+#### 🎯 Phase 2 預期產出 ✅ **已完成**
+**程式碼檔案**：
+- 1個新增GAS檔案（OpenAIHandler.gs）
+- 本地備份的1個.js檔案（OpenAIHandler.js）
+- 修改現有檔案（Config.gs/Config.js, Code.gs/Code.js）
+
+**功能實現**：
+- AI語意解析和語音錯誤修正
+- 信心度評分系統
+- 降級機制（關鍵字匹配）
+- 完整的錯誤處理和重試機制
+
+**測試結果**：
+- OpenAI API連線穩定（偶發401但重試成功）
+- LINE Bot AI功能正常運作
+- 語音錯誤修正準確（「藥申請」→「申請」）
+- 信心度評分運作正常
+- 盲人語音錯誤處理優化（「時」→「十」等數字錯誤修正）
+
+#### 🔧 Phase 2 穩定性優化建議（暫不執行）
+**目前系統運作穩定，以下優化建議可於未來需要時實施**：
+
+1. **日誌加強**：
+   - 在呼叫 OpenAI API 前記錄金鑰前綴（前8碼）
+   - 記錄 `OpenAI-Project` 值以便除錯
+
+2. **固定 Project 路由**：
+   - 在 headers 加上 `OpenAI-Project` 參數
+   - 避免 API 在不同 Project 間跳轉導致權限問題
+
+3. **優化錯誤重試機制**：
+   - 對 401 錯誤不重試（權限問題重試無效）
+   - 只對 429/5xx/超時進行重試
+   - 使用 `muteHttpExceptions: true` 獲取完整錯誤訊息
+
+4. **部署管理**：
+   - 保持單一正式部署
+   - 確保 LINE Webhook 指向正確的 `/exec` URL
+   - 定期檢查部署權限設定
+
+### Phase 3: 狀態管理與時間日期邏輯 (1-2週)
+
+#### 📋 Phase 3 範疇定義
+**Phase 3 專注於**：
+- **對話狀態管理**：追蹤用戶在申請流程的哪個步驟
+- **智能確認機制**：根據上下文理解「對」「不對」的意思
+- **時間窗口管理**：1-15日申請規則
+- **日期計算**：週六週日的計算和選擇
+- **分層處理架構**：優先處理簡單指令，減少AI依賴
+
+**分層處理架構設計**：
+```javascript
+// 第一層：狀態相關處理（知道上下文）
+if (currentState === 'waiting_confirmation') {
+  if (text === '對' || text === '好') return confirmAction();
+  if (text === '不對' || text === '不要') return rejectAction();
+}
+
+// 第二層：關鍵字快速匹配（不需要AI）
+if (simpleKeywords[text]) return handleSimpleCommand(text);
+
+// 第三層：AI語音修正（Phase 2的功能）
+return analyzeWithAI(text);
+```
+#### 3.1 對話狀態管理系統
+- [ ] 建立用戶狀態追蹤機制
+- [ ] 實現多輪對話支援
+- [ ] 建立狀態轉換邏輯
+- [ ] 實現上下文記憶功能
+
+#### 3.2 智能確認機制
+- [ ] 根據狀態理解確認詞（對、好、是）
+- [ ] 根據狀態理解否定詞（不對、不要、錯）
+- [ ] 避免確認循環問題
+- [ ] 建立清晰的確認流程
+
+#### 3.3 時間窗口管理
 - [ ] 實現申請期間檢查（1-15日規則）
 - [ ] 建立月份推算邏輯（當前月+1或+2）
 - [ ] 實現申請關閉期提醒功能
 
-#### 3.2 日期計算系統
+#### 3.4 日期計算系統
 - [ ] 建立週六週日日期計算函數
 - [ ] 實現預設3個週六邏輯（媽媽偏好）
 - [ ] 支援自訂日期選擇（含週日）
 - [ ] AI日期選擇解析（「第一個週六」等自然語言）
 
-#### 3.3 階段測試里程碑
+#### 3.5 分層處理優化
+- [ ] 建立簡單指令快速處理機制
+- [ ] 減少不必要的AI調用
+- [ ] 優化處理效率
+- [ ] 降低錯誤率
+
+#### 3.6 階段測試里程碑
+- [ ] ✅ 狀態管理正確追蹤對話流程
+- [ ] ✅ 「對」「不對」能根據上下文正確理解
+- [ ] ✅ 無確認循環問題
 - [ ] ✅ 不同日期的申請期間判斷準確
 - [ ] ✅ 日期計算結果正確
 - [ ] ✅ 自然語言日期選擇解析正確
 
 ### Phase 4: Google服務整合 (2週)
+
+#### 📋 Phase 4 範疇定義
+**Phase 4 專注於**：
+- **資料持久化**：使用 Google Sheets 記錄申請
+- **檔案管理**：使用 Google Drive 存放文件
+- **狀態追蹤**：申請進度管理
+- **用戶資料**：記錄用戶偏好和歷史
 #### 4.1 Google Sheets資料管理
 - [ ] 建立申請記錄表格結構
 - [ ] 實現Sheets API讀寫功能
@@ -147,6 +275,13 @@ code/gas/
 - [ ] ✅ 狀態更新機制運作正常
 
 ### Phase 5: 文件處理和網站自動化 (2-3週)
+
+#### 📋 Phase 5 範疇定義
+**Phase 5 專注於**：
+- **自動化申請**：完成實際的網站申請流程
+- **文件生成**：自動填寫申請表
+- **檔案上傳**：處理證照和申請文件
+- **結果通知**：申請結果回報
 #### 5.1 Google Cloud Run環境
 - [ ] 建立Python專案和Dockerfile
 - [ ] 部署基本HTTP服務
@@ -172,6 +307,13 @@ code/gas/
 - [ ] ✅ 雙檔案上傳功能正常
 
 ### Phase 6: 完整整合和用戶測試 (1-2週)
+
+#### 📋 Phase 6 範疇定義
+**Phase 6 專注於**：
+- **端到端測試**：完整流程驗證
+- **用戶體驗優化**：根據實際使用調整
+- **錯誤處理完善**：處理各種異常情況
+- **上線準備**：生產環境部署
 #### 6.1 端到端整合
 - [ ] 完整申請流程串接（從LINE對話到網站提交）
 - [ ] 錯誤處理和通知機制
@@ -263,5 +405,5 @@ code/gas/
 
 ---
 
-**最後更新**: 2024年1月  
-**版本**: v1.0
+**最後更新**: 2025年9月  
+**版本**: v2.0 - Phase 2 完成
