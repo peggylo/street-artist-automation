@@ -3,22 +3,97 @@
 ## 🚀 開發階段規劃
 
 ### Phase 1: 基礎LINE Bot架構 (1-2週)
+
+#### 🎯 Phase 1 開發決策
+- **Bot名稱**：松菸申請助手
+- **測試群組**：2人群組（開發者+協助者）
+- **GAS權限設定**：
+  - 執行權限：「以我的身分執行」
+  - 存取權限：「任何人，甚至是匿名使用者」
+- **日誌記錄**：記錄所有訊息和處理結果（方便除錯）
+- **API Keys存放**：使用 PropertiesService
+- **開發策略**：完整檔案結構開發（避免後續重構）
+
+#### 📁 GAS專案檔案結構
+```
+街頭藝人申請系統 (GAS專案)
+├── Code.gs                 # 主要邏輯和 Webhook 處理 [Phase 1]
+├── LineHandler.gs          # LINE API 相關函數 [Phase 1]
+├── Config.gs               # 設定和常數 [Phase 1]
+├── OpenAIHandler.gs        # OpenAI API 處理 [Phase 2]
+├── DateUtils.gs            # 日期計算工具 [Phase 3]
+├── SheetsHandler.gs        # Google Sheets 操作 [Phase 4]
+└── DriveHandler.gs         # Google Drive 操作 [Phase 4]
+```
+
+#### 📁 本地備份檔案結構
+```
+code/gas/
+├── Code.js                 # Code.gs 備份 [Phase 1]
+├── LineHandler.js          # LineHandler.gs 備份 [Phase 1]
+├── Config.js               # Config.gs 備份（與GAS相同，透過git ignore保護）[Phase 1]
+├── Config.js.example       # 設定檔範例（可進git）[Phase 1]
+├── OpenAIHandler.js        # OpenAIHandler.gs 備份 [Phase 2]
+├── DateUtils.js            # DateUtils.gs 備份 [Phase 3]
+├── SheetsHandler.js        # SheetsHandler.gs 備份 [Phase 4]
+└── DriveHandler.js         # DriveHandler.gs 備份 [Phase 4]
+```
+
+#### 🎯 Phase 1 需要建立的檔案
+**GAS專案中**：
+- `Code.gs` - 主要邏輯和 Webhook 處理
+- `LineHandler.gs` - LINE API 相關函數
+- `Config.gs` - 設定和常數
+
+**本地備份**：
+- `code/gas/Code.js` - 與GAS相同
+- `code/gas/LineHandler.js` - 與GAS相同
+- `code/gas/Config.js` - 與GAS相同（透過git ignore保護）
+- `code/gas/Config.js.example` - 設定檔範例（可進git）
+
 #### 1.1 LINE Bot基本設置
 - [ ] 建立LINE Developer帳號和Bot
+  - Bot名稱：松菸申請助手
+  - Bot描述：協助視障用戶申請松山文創園區街頭藝人場地
 - [ ] 設定Webhook URL（使用Google Apps Script）
 - [ ] 實現基本訊息接收和回覆功能
-- [ ] 設定三人群組（主要用戶+協助者+Bot）
+- [ ] 設定2人測試群組（開發者+協助者+Bot）
 
 #### 1.2 Google Apps Script環境建置
-- [ ] 建立GAS專案並設定權限
+- [ ] 建立GAS專案：「街頭藝人申請系統」
+- [ ] 建立Phase 1需要的檔案結構（3個.gs檔案）
+  - `Code.gs` - 主要邏輯和 Webhook 處理
+  - `LineHandler.gs` - LINE API 相關函數
+  - `Config.gs` - 設定和常數
+- [ ] 設定PropertiesService存放API Keys
+- [ ] 設定權限：執行身分「以我的身分執行」，存取權限「任何人，甚至是匿名使用者」
 - [ ] 整合LINE Messaging API
-- [ ] 實現基本對話邏輯架構
-- [ ] 建立日誌記錄機制
+- [ ] 實現詳細日誌記錄機制（記錄所有訊息和處理結果）
 
 #### 1.3 階段測試里程碑
-- [ ] ✅ 能接收群組訊息並回覆「收到」
+- [ ] ✅ 能接收群組訊息並回覆「收到：[訊息內容]」
 - [ ] ✅ 群組成員都能看到Bot互動
 - [ ] ✅ 基本錯誤處理（訊息格式錯誤等）
+- [ ] ✅ 日誌正確記錄所有互動
+- [ ] ✅ PropertiesService正確存取API Keys
+
+#### 🎯 Phase 1 預期產出
+**程式碼檔案**：
+- 3個GAS檔案（Code.gs, LineHandler.gs, Config.gs）
+- 本地備份的3個.js檔案（Code.js, LineHandler.js, Config.js）
+- Config.js.example範例檔案
+
+**Config.js 用途說明**：
+- 存放非敏感設定：系統常數、錯誤訊息模板、業務邏輯設定
+- 提供取得敏感資訊的方法：透過 PropertiesService 存取 API Keys
+- 敏感資訊（API Keys）存放在 GAS PropertiesService，不在程式碼中
+
+**設定檔案**：
+- LINE Bot設定資訊記錄
+- GAS部署資訊記錄
+
+**測試結果**：
+- 完整的測試記錄和問題解決方案
 
 ### Phase 2: AI語意解析整合 (1-2週)
 #### 2.1 OpenAI API整合
