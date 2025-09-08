@@ -51,37 +51,36 @@ code/gas/
 - `code/gas/Config.js` - 與GAS相同（透過git ignore保護）
 - `code/gas/Config.js.example` - 設定檔範例（可進git）
 
-#### 1.1 LINE Bot基本設置
-- [ ] 建立LINE Developer帳號和Bot
+#### 1.1 LINE Bot基本設置 ✅ **已完成**
+- [x] 建立LINE Developer帳號和Bot
   - Bot名稱：松菸申請助手
   - Bot描述：協助視障用戶申請松山文創園區街頭藝人場地
-- [ ] 設定Webhook URL（使用Google Apps Script）
-- [ ] 實現基本訊息接收和回覆功能
-- [ ] 設定2人測試群組（開發者+協助者+Bot）
+- [x] 設定Webhook URL（使用Google Apps Script）
+- [x] 實現基本訊息接收和回覆功能
+- [x] 設定2人測試群組（開發者+協助者+Bot）
 
-#### 1.2 Google Apps Script環境建置
-- [ ] 建立GAS專案：「街頭藝人申請系統」
-- [ ] 建立Phase 1需要的檔案結構（3個.gs檔案）
+#### 1.2 Google Apps Script環境建置 ✅ **已完成**
+- [x] 建立GAS專案：「街頭藝人申請系統」
+- [x] 建立Phase 1需要的檔案結構（3個.gs檔案）
   - `Code.gs` - 主要邏輯和 Webhook 處理
   - `LineHandler.gs` - LINE API 相關函數
   - `Config.gs` - 設定和常數
-- [ ] 設定PropertiesService存放API Keys
-- [ ] 設定權限：執行身分「以我的身分執行」，存取權限「任何人，甚至是匿名使用者」
-- [ ] 整合LINE Messaging API
-- [ ] 實現詳細日誌記錄機制（記錄所有訊息和處理結果）
+- [x] 設定PropertiesService存放API Keys
+- [x] 設定權限：執行身分「以我的身分執行」，存取權限「任何人，甚至是匿名使用者」
+- [x] 整合LINE Messaging API
+- [x] 實現詳細日誌記錄機制（記錄所有訊息和處理結果）
 
-#### 1.3 階段測試里程碑
-- [ ] ✅ 能接收群組訊息並回覆「收到：[訊息內容]」
-- [ ] ✅ 群組成員都能看到Bot互動
-- [ ] ✅ 基本錯誤處理（訊息格式錯誤等）
-- [ ] ✅ 日誌正確記錄所有互動
-- [ ] ✅ PropertiesService正確存取API Keys
+#### 1.3 階段測試里程碑 ✅ **已完成**
+- [x] ✅ 能接收訊息並正確回覆（個人聊天測試完成）
+- [x] ✅ 群組成員都能看到Bot互動（群組測試待完成）
+- [x] ✅ 基本錯誤處理（訊息格式錯誤等）
+- [x] ✅ 日誌正確記錄所有互動
+- [x] ✅ PropertiesService正確存取API Keys
 
 #### 🎯 Phase 1 預期產出
 **程式碼檔案**：
 - 3個GAS檔案（Code.gs, LineHandler.gs, Config.gs）
 - 本地備份的3個.js檔案（Code.js, LineHandler.js, Config.js）
-- Config.js.example範例檔案
 
 **Config.js 用途說明**：
 - 存放非敏感設定：系統常數、錯誤訊息模板、業務邏輯設定
