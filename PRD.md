@@ -387,8 +387,8 @@ AI解析：selected_indices=[1,5], confidence=0.75
 | 2 | JavaScript + OpenAI API | AI語意理解 | 智能指令識別 |
 | 3 | JavaScript | 日期邏輯計算 | 時間窗口管理 |
 | 4 | JavaScript + Google APIs | 資料存儲 | 完整資料記錄 |
-| 5 | Python + Playwright | 自動化操作 | 網站自動提交 |
-| 6 | 全技術棧 | 整合測試 | 完整可用系統 |
+| 5 | Python + 文件處理 | 文件生成系統 | Word→PDF自動處理 |
+| 6 | Python + Playwright + 整合測試 | 網站自動化 | 完整可用系統 |
 
 
 ## 📋 開發參考
