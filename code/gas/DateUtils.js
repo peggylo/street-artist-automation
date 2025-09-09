@@ -165,7 +165,7 @@ function parseDateSelection(userInput, targetMonth, targetYear) {
 }
 
 /**
- * 增強版日期解析（支援中文數字和更多格式）
+ * 簡化版日期解析（方案A：只處理具體日期號碼）
  * @param {string} userInput - 用戶輸入
  * @param {number} targetMonth - 目標月份
  * @param {number} targetYear - 目標年份
@@ -179,90 +179,33 @@ function parseDateSelectionEnhanced(userInput, targetMonth, targetYear) {
     message: ''
   };
   
-  // 解析「前N個週六」
-  const frontSaturdayMatch = input.match(/前(\d+)個?週[六6]/);
-  if (frontSaturdayMatch) {
-    const count = parseInt(frontSaturdayMatch[1]);
-    const saturdays = getSaturdays(targetYear, targetMonth, count);
-    result.success = true;
-    result.dates = saturdays;
-    result.message = `已選擇前${count}個週六`;
-    return result;
-  }
-  
-  // 解析「後N個週六」
-  const backSaturdayMatch = input.match(/[後后](\d+)個?週[六6]/);
-  if (backSaturdayMatch) {
-    const count = parseInt(backSaturdayMatch[1]);
-    const saturdays = getSaturdays(targetYear, targetMonth);
-    const lastSaturdays = saturdays.slice(-count);
-    result.success = true;
-    result.dates = lastSaturdays;
-    result.message = `已選擇後${count}個週六`;
-    return result;
-  }
-  
-  // 解析「前N個週日」
-  const frontSundayMatch = input.match(/前(\d+)個?週[日0]/);
-  if (frontSundayMatch) {
-    const count = parseInt(frontSundayMatch[1]);
-    const sundays = getSundays(targetYear, targetMonth, count);
-    result.success = true;
-    result.dates = sundays;
-    result.message = `已選擇前${count}個週日`;
-    return result;
-  }
-  
-  // 解析「後N個週日」
-  const backSundayMatch = input.match(/[後后](\d+)個?週[日0]/);
-  if (backSundayMatch) {
-    const count = parseInt(backSundayMatch[1]);
-    const sundays = getSundays(targetYear, targetMonth);
-    const lastSundays = sundays.slice(-count);
-    result.success = true;
-    result.dates = lastSundays;
-    result.message = `已選擇後${count}個週日`;
-    return result;
-  }
-  
-  // 解析「所有週六」
-  if (input.includes('所有週六') || input.includes('全部週六') || input.includes('每個週六')) {
-    const saturdays = getSaturdays(targetYear, targetMonth);
-    result.success = true;
-    result.dates = saturdays;
-    result.message = `已選擇所有週六（共${saturdays.length}天）`;
-    return result;
-  }
-  
-  // 解析「所有週日」
-  if (input.includes('所有週日') || input.includes('全部週日') || input.includes('每個週日')) {
-    const sundays = getSundays(targetYear, targetMonth);
-    result.success = true;
-    result.dates = sundays;
-    result.message = `已選擇所有週日（共${sundays.length}天）`;
-    return result;
-  }
-  
-  // 解析具體日期（支援多種格式）
+  // 只解析具體日期（支援多種格式）
   // 支援：5號、5日、五號、五日、5、五
   const datePattern = /(\d{1,2})[號号日]?/g;
   const matches = [...input.matchAll(datePattern)];
+  
   if (matches.length > 0) {
     const selectedDates = [];
     const addedDays = new Set(); // 避免重複
+    const invalidDays = []; // 記錄無效日期
     
     for (const match of matches) {
       const day = parseInt(match[1]);
-      if (day >= 1 && day <= 31 && !addedDays.has(day)) {
-        addedDays.add(day);
+      if (day >= 1 && day <= 31) {
+        // 檢查該日期在目標月份是否存在
         const date = new Date(targetYear, targetMonth - 1, day);
-        const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
-        selectedDates.push({
-          date: day,
-          day: dayOfWeek,
-          display: `${targetMonth}/${day}(${dayOfWeek})`,
-          fullDate: date
-        });
+        if (date.getMonth() === targetMonth - 1 && !addedDays.has(day)) {
+          addedDays.add(day);
+          const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+          selectedDates.push({
+            date: day,
+            day: dayOfWeek,
+            display: `${targetMonth}/${day}(${dayOfWeek})`,
+            fullDate: date
+          });
+        } else if (day > 31) {
+          invalidDays.push(day);
+        }
       }
     }
     
@@ -271,13 +214,19 @@ function parseDateSelectionEnhanced(userInput, targetMonth, targetYear) {
       selectedDates.sort((a, b) => a.date - b.date);
       result.success = true;
       result.dates = selectedDates;
-      result.message = `已選擇 ${selectedDates.map(d => d.display).join('、')}`;
+      
+      // 如果有無效日期，在訊息中提醒（但不阻止成功）
+      let message = `已選擇 ${selectedDates.map(d => d.display).join('、')}`;
+      if (invalidDays.length > 0) {
+        message += `\n（${targetMonth}月沒有${invalidDays.join('、')}號，已忽略）`;
+      }
+      result.message = message;
       return result;
     }
   }
   
-  // 無法解析
-  result.message = '無法理解您的日期選擇，請重新說明';
+  // 無法解析到任何有效日期
+  result.message = '請說具體的日期號碼，例如「11號、12號、26號」';
   return result;
 }
 

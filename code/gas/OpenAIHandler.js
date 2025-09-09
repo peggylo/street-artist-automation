@@ -108,36 +108,32 @@ function buildPromptByContext(userInput, context) {
     case 'date_selection':
       return basePrompt + `
 
-你的專門任務：理解媽媽說的日期並轉換成標準格式
+你的專門任務：理解媽媽說的日期號碼並轉換成標準格式
 
 媽媽常見的語音錯誤模式（基於實際觀察）：
 - 「時越」= 「十月」（時 = 十，越 = 月）
 - 「蝕二」= 「十二」（蝕 = 十）
 - 「二六」= 「二十六」（省略十）
-- 「十一」可能是「11」
+- 「時月」= 「十月」
 - 「五號」= 「5號」
 
-重要：請將所有日期統一轉換為標準格式「X號」
-例如：
-- 「十月十一」→ 「11號」
-- 「時越十二」→ 「12號」  
-- 「十月二六」→ 「26號」
-- 「五號十二號」→ 「5號、12號」
+重要：只處理具體的日期號碼，統一轉換為「X號」格式
+忽略「前幾個」「所有」等複雜指令，專注理解日期號碼
 
 範例轉換：
 輸入「十月十一 時越十二 十月二六」
-→ {"intent":"specific_dates","confidence":0.9,"correctedText":"11號、12號、26號","explanation":"語音錯誤修正：時越=十月，統一格式"}
+→ {"intent":"specific_dates","confidence":0.9,"correctedText":"11號、12號、26號","explanation":"語音錯誤修正：時越=十月，提取日期號碼"}
 
 輸入「五號十二號十九號」  
 → {"intent":"specific_dates","confidence":0.95,"correctedText":"5號、12號、19號","explanation":"統一日期格式"}
 
-輸入「前三個週六」
-→ {"intent":"select_dates","confidence":0.9,"correctedText":"前3個週六","explanation":"標準化數字格式"}
+輸入「二號 二六號 時越五日」
+→ {"intent":"specific_dates","confidence":0.9,"correctedText":"2號、26號、5號","explanation":"語音錯誤修正，提取日期號碼"}
 
-輸入「所有週六」
-→ {"intent":"all_saturdays","confidence":0.95,"correctedText":"所有週六","explanation":"選擇所有週六"}
+輸入「蝕二號、二六號、時越五日」
+→ {"intent":"specific_dates","confidence":0.9,"correctedText":"12號、26號、5號","explanation":"語音錯誤修正：蝕二=十二，時越=十月"}
 
-請特別注意媽媽的語音輸入特點並提供準確的理解！`;
+專注於準確理解日期號碼，不處理複雜的週六週日指令！`;
 
     case 'video_choice':
       return basePrompt + `
@@ -368,7 +364,7 @@ function matchApplicationKeywords(input, keywords) {
 }
 
 /**
- * 日期選擇關鍵字匹配
+ * 日期選擇關鍵字匹配（方案A：簡化版）
  */
 function matchDateSelectionKeywords(input, keywords) {
   // 確認預設日期
@@ -397,44 +393,7 @@ function matchDateSelectionKeywords(input, keywords) {
     }
   }
   
-  // Phase 3: 特定日期選擇
-  if (input.includes('週六') || input.includes('周六')) {
-    if (input.includes('所有') || input.includes('全部')) {
-      return {
-        intent: 'all_saturdays',
-        confidence: 0.9,
-        correctedText: '所有週六',
-        explanation: '選擇所有週六',
-        source: 'fallback'
-      };
-    }
-    // 前N個週六
-    const match = input.match(/前(\d+)個?週六/);
-    if (match) {
-      return {
-        intent: 'select_dates',
-        confidence: 0.85,
-        correctedText: `前${match[1]}個週六`,
-        explanation: '選擇特定數量週六',
-        source: 'fallback'
-      };
-    }
-  }
-  
-  // 週日選擇
-  if (input.includes('週日') || input.includes('周日')) {
-    if (input.includes('所有') || input.includes('全部')) {
-      return {
-        intent: 'all_sundays',
-        confidence: 0.9,
-        correctedText: '所有週日',
-        explanation: '選擇所有週日',
-        source: 'fallback'
-      };
-    }
-  }
-  
-  // 具體日期（如「5號」）
+  // 只處理具體日期號碼
   if (input.match(/\d{1,2}[號日]/)) {
     return {
       intent: 'specific_dates',
@@ -449,7 +408,7 @@ function matchDateSelectionKeywords(input, keywords) {
     intent: 'unclear',
     confidence: 0.3,
     correctedText: input,
-    explanation: '日期選擇不明確',
+    explanation: '請說具體日期號碼',
     source: 'fallback'
   };
 }
