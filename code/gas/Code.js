@@ -599,7 +599,7 @@ function handleAudioMessage(event) {
 }
 
 /**
- * 處理影片訊息 (Phase 3)
+ * 處理影片訊息 (Phase 3 完整版)
  */
 function handleVideoMessage(event) {
   const replyToken = event.replyToken;
@@ -616,36 +616,58 @@ function handleVideoMessage(event) {
   }
   
   try {
-    // Phase 3 簡化版：只記錄收到影片，實際上傳功能待實作
-    console.log('📹 準備處理影片上傳（簡化版）');
+    console.log('📹 開始處理影片上傳');
     
-    // TODO: 實際實作影片上傳到 Google Drive
-    // const videoUrl = uploadVideoToDrive(messageId, userId);
+    // 1. 從 LINE 下載影片
+    const videoBlob = downloadVideoFromLine(messageId);
+    if (!videoBlob) {
+      const errorResponse = handleVideoUploadError('network_error', '影片下載失敗（網路問題），請稍後重試', userId);
+      replyMessage(replyToken, errorResponse);
+      return;
+    }
     
-    // 模擬成功上傳
+    // 2. 檢查檔案類型
+    const contentType = videoBlob.getContentType();
+    if (!contentType.startsWith('video/')) {
+      const errorResponse = handleVideoUploadError('invalid_format', '請上傳影片檔案（MP4、MOV等格式）', userId);
+      replyMessage(replyToken, errorResponse);
+      return;
+    }
+    
+    // 3. 生成檔案名稱
+    const fileName = generateVideoFileName(state.targetMonth.month, state.targetMonth.year);
+    console.log('📝 生成檔案名稱:', fileName);
+    
+    // 4. 上傳到 Google Drive
+    const uploadResult = uploadVideoToDrive(videoBlob, fileName);
+    
+    if (!uploadResult.success) {
+      const errorResponse = handleVideoUploadError(uploadResult.error, uploadResult.message, userId);
+      replyMessage(replyToken, errorResponse);
+      return;
+    }
+    
+    // 5. 上傳成功，更新狀態
     state.useDefaultVideo = false;
-    state.newVideoId = messageId; // 暫存訊息ID
+    state.newVideoId = uploadResult.fileId;
+    state.newVideoUrl = uploadResult.fileUrl;
     state.currentStep = 'application_started';
     state.context = 'application';
     setUserState(userId, state);
     
-    const dateDisplay = state.selectedDates.map(d => d.display).join('、');
-    
-    const response = `✅ 影片已收到！
+    const response = `✅ 影片上傳成功！
 
-📅 申請月份：${state.targetMonth.display}
-📍 申請日期：${dateDisplay}
-🎬 表演影片：新上傳影片
+${getApplicationSummary(state)}
 
-確認請說「好」，或繼續修改
-
-⚠️ Phase 3 測試中：影片上傳到 Drive 功能開發中`;
+✅ 確認請說「好」
+📝 繼續修改請說「改日期」或「改影片」`;
     
     replyMessage(replyToken, response);
     
   } catch (error) {
     console.error('❌ 影片處理失敗:', error);
-    replyMessage(replyToken, '影片處理失敗，請重新上傳');
+    const errorResponse = handleVideoUploadError('system_error', '系統錯誤，請稍後重試', userId);
+    replyMessage(replyToken, errorResponse);
   }
 }
 
@@ -905,11 +927,207 @@ function testPhase3() {
       console.log('預設日期:', defaultDates);
     }
     
-    console.log('\n🎉 Phase 3 功能測試完成！');
+  console.log('\n🎉 Phase 3 功能測試完成！');
+  return true;
+  
+} catch (error) {
+  console.error('❌ Phase 3 功能測試失敗:', error);
+  console.error('📋 錯誤詳情:', error.stack);
+  return false;
+}
+}
+
+// =====================================================
+// Phase 3: 影片處理函數
+// =====================================================
+
+/**
+ * 生成帶時間戳的影片檔名
+ * @param {number} month - 申請月份
+ * @param {number} year - 申請年份
+ * @return {string} 檔案名稱
+ */
+function generateVideoFileName(month, year) {
+  const now = new Date();
+  const monthStr = month.toString().padStart(2, '0');
+  const dayStr = now.getDate().toString().padStart(2, '0');
+  const hourStr = now.getHours().toString().padStart(2, '0');
+  const minuteStr = now.getMinutes().toString().padStart(2, '0');
+  
+  return `表演影片_${year}年${monthStr}月_${monthStr}${dayStr}_${hourStr}${minuteStr}.mp4`;
+}
+
+/**
+ * 從 LINE 下載影片內容
+ * @param {string} messageId - LINE 訊息 ID
+ * @return {Blob|null} 影片檔案 Blob
+ */
+function downloadVideoFromLine(messageId) {
+  try {
+    console.log('📥 開始從 LINE 下載影片:', messageId);
+    
+    const lineConfig = getLineConfig();
+    const url = `https://api-data.line.me/v2/bot/message/${messageId}/content`;
+    
+    const options = {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + lineConfig.ACCESS_TOKEN
+      }
+    };
+    
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    
+    if (responseCode === 200) {
+      const videoBlob = response.getBlob();
+      console.log('✅ 影片下載成功，大小:', Math.round(videoBlob.getBytes().length / 1024 / 1024) + 'MB');
+      return videoBlob;
+    } else {
+      console.error('❌ LINE 影片下載失敗:', responseCode);
+      return null;
+    }
+    
+  } catch (error) {
+    console.error('❌ 下載影片時發生錯誤:', error);
+    return null;
+  }
+}
+
+/**
+ * 上傳影片到 Google Drive
+ * @param {Blob} videoBlob - 影片檔案 Blob
+ * @param {string} fileName - 檔案名稱
+ * @return {Object} {success: boolean, fileId: string, fileUrl: string, error: string}
+ */
+function uploadVideoToDrive(videoBlob, fileName) {
+  try {
+    console.log('📤 開始上傳影片到 Drive:', fileName);
+    
+    const config = CONFIG.PHASE3.GOOGLE_DRIVE;
+    
+    // 檢查檔案大小
+    const fileSizeMB = videoBlob.getBytes().length / 1024 / 1024;
+    if (fileSizeMB > config.MAX_VIDEO_SIZE_MB) {
+      return {
+        success: false,
+        error: 'file_too_large',
+        message: `影片檔案太大（${Math.round(fileSizeMB)}MB），請壓縮後重新上傳`
+      };
+    }
+    
+    // 上傳到 Drive
+    const file = DriveApp.getFolderById(config.VIDEO_FOLDER_ID)
+      .createFile(videoBlob.setName(fileName));
+    
+    // 設定檔案權限：知道連結的任何人都能檢視
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    const fileId = file.getId();
+    const fileUrl = `https://drive.google.com/file/d/${fileId}/view`;
+    
+    console.log('✅ 影片上傳成功:', fileId);
+    
+    return {
+      success: true,
+      fileId: fileId,
+      fileUrl: fileUrl,
+      fileName: fileName,
+      fileSizeMB: Math.round(fileSizeMB)
+    };
+    
+  } catch (error) {
+    console.error('❌ 上傳影片到 Drive 失敗:', error);
+    return {
+      success: false,
+      error: 'drive_error',
+      message: '上傳服務暫時無法使用，請稍後重試'
+    };
+  }
+}
+
+/**
+ * 處理影片上傳錯誤
+ * @param {string} errorType - 錯誤類型
+ * @param {string} errorMessage - 錯誤訊息
+ * @param {string} userId - 用戶ID
+ * @return {string} 錯誤回應訊息
+ */
+function handleVideoUploadError(errorType, errorMessage, userId) {
+  const state = getUserState(userId);
+  if (state) {
+    // 降級到常用影片
+    state.useDefaultVideo = true;
+    state.currentStep = 'application_started';
+    state.context = 'application';
+    setUserState(userId, state);
+    
+    const response = `❌ ${errorMessage}
+
+💡 目前先使用常用影片繼續申請
+
+${getApplicationSummary(state)}
+
+✅ 確認請說「好」
+📝 重新上傳請說「改影片」`;
+    
+    return response;
+  }
+  
+  return `❌ ${errorMessage}\n\n請先說「申請」重新開始流程`;
+}
+
+/**
+ * 測試影片處理功能
+ */
+function testVideoHandling() {
+  try {
+    console.log('🧪 開始影片處理功能測試...');
+    
+    // 1. 測試檔案命名
+    console.log('1. 測試檔案命名...');
+    const fileName = generateVideoFileName(10, 2024);
+    console.log('生成檔案名稱:', fileName);
+    
+    // 2. 測試 Drive 權限
+    console.log('2. 測試 Drive 存取權限...');
+    const config = CONFIG.PHASE3.GOOGLE_DRIVE;
+    
+    try {
+      const folder = DriveApp.getFolderById(config.VIDEO_FOLDER_ID);
+      console.log('✅ Drive 資料夾存取正常:', folder.getName());
+      
+      // 測試常用影片存取
+      const defaultVideo = DriveApp.getFileById(config.DEFAULT_VIDEO_ID);
+      console.log('✅ 常用影片存取正常:', defaultVideo.getName());
+      
+    } catch (driveError) {
+      console.error('❌ Drive 存取失敗:', driveError);
+      return false;
+    }
+    
+    // 3. 測試錯誤處理
+    console.log('3. 測試錯誤處理機制...');
+    const testUserId = 'test-video-user';
+    
+    // 模擬用戶狀態
+    setUserState(testUserId, {
+      currentStep: 'waiting_video_upload',
+      targetMonth: { month: 10, display: '10月' },
+      selectedDates: [{ display: '10/4(六)' }]
+    });
+    
+    const errorResponse = handleVideoUploadError('file_too_large', '測試錯誤訊息', testUserId);
+    console.log('錯誤處理回應:', errorResponse);
+    
+    // 清理測試狀態
+    clearUserState(testUserId);
+    
+    console.log('\n🎉 影片處理功能測試完成！');
     return true;
     
   } catch (error) {
-    console.error('❌ Phase 3 功能測試失敗:', error);
+    console.error('❌ 影片處理功能測試失敗:', error);
     console.error('📋 錯誤詳情:', error.stack);
     return false;
   }
