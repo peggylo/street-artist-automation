@@ -67,10 +67,11 @@ function buildPromptByContext(userInput, context) {
 - 「號」和「日」都可以接受
 
 申請相關錯誤：
-- 「藥」、「要」、「腰」常混淆
-- 「我藥申請」= 「我要申請」
-- 「藥聲請」= 「要申請」
+- 「藥」、「要」、「腰」在語音輸入時常混淆
+- 「我藥申請」= 「我要申請」（藥是語音錯誤）
+- 「藥聲請」= 「要申請」（藥是語音錯誤）
 - 「聲請」、「身請」= 「申請」
+- 注意：「我想」和「我要」都是正確表達，不需要修正
 
 重要範例：
 - 「六越十六日」= 「六月十六日」
@@ -143,6 +144,7 @@ function buildPromptByContext(userInput, context) {
 
 重要範例：
 輸入「我藥聲請」→ {"intent":"apply","confidence":0.95,"correctedText":"我要申請","explanation":"語音錯誤修正：藥→要、聲請→申請"}
+輸入「我想申請」→ {"intent":"apply","confidence":0.95,"correctedText":"我想申請","explanation":"正確表達，無需修正"}
 輸入「六越十六日」→ {"intent":"date","confidence":0.95,"correctedText":"六月十六日","explanation":"語音錯誤修正：越→月"}
 輸入「聲請」→ {"intent":"apply","confidence":0.9,"correctedText":"申請","explanation":"語音錯誤修正"}
 輸入「正確」→ {"intent":"confirm","confidence":0.9,"correctedText":"確認","explanation":"用戶表示確認"}`;
