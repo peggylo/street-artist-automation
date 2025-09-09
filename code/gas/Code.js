@@ -532,13 +532,7 @@ function startVideoModification(userId) {
   state.useDefaultVideo = false;
   setUserState(userId, state);
   
-  return `🎬 請上傳新的表演影片
-
-⚠️ 注意事項：
-• 檔案大小限制：${CONFIG.PHASE3.GOOGLE_DRIVE.MAX_VIDEO_SIZE_MB}MB
-• 支援格式：MP4、MOV、AVI
-
-請直接傳送影片檔案`;
+  return `請直接傳送影片檔案`;
 }
 
 /**
