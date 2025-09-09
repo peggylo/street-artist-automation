@@ -363,20 +363,16 @@ function handleStateBasedInput(userState, text, userId) {
     case 'confirming_dates':
       // 確認 AI 理解的日期
       if (['對', '好', '正確', '是', '確認', 'ok'].includes(normalizedText)) {
-        // 確認正確，使用 AI 理解的日期
+        // 確認正確，直接完成日期選擇並回到申請摘要
         const state = getUserState(userId);
         state.selectedDates = state.pendingDates;
-        state.currentStep = 'selecting_date';
+        state.currentStep = 'application_started';
+        state.context = 'application';
         delete state.pendingDates;
         delete state.pendingOriginalInput;
         setUserState(userId, state);
         
-        return `✅ 日期已更新！
-
-📍 目前選擇：${state.selectedDates.map(d => d.display).join('、')}
-
-🔄 還要改嗎？直接說新的日期
-✅ 滿意請說「好」完成選擇`;
+        return getApplicationSummary(state) + '\n\n✅ 確認請說「好」\n📝 繼續修改請說「改日期」或「改影片」';
       } else {
         // 不正確，回到日期選擇狀態重新輸入
         const state = getUserState(userId);
