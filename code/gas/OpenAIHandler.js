@@ -108,25 +108,62 @@ function buildPromptByContext(userInput, context) {
     case 'date_selection':
       return basePrompt + `
 
-可能的意圖類型：
-- "confirm": 確認預設日期
-- "modify": 要修改日期選擇
-- "select_dates": 選擇特定日期（如「前兩個週六」、「第一和第三個」）
-- "unclear": 無法理解選擇
+你的專門任務：理解媽媽說的日期並轉換成標準格式
 
-範例：
-輸入「前兩個週六」→ {"intent":"select_dates","confidence":0.8,"correctedText":"前兩個週六","explanation":"選擇前兩個週六日期"}`;
+媽媽常見的語音錯誤模式（基於實際觀察）：
+- 「時越」= 「十月」（時 = 十，越 = 月）
+- 「蝕二」= 「十二」（蝕 = 十）
+- 「二六」= 「二十六」（省略十）
+- 「十一」可能是「11」
+- 「五號」= 「5號」
+
+重要：請將所有日期統一轉換為標準格式「X號」
+例如：
+- 「十月十一」→ 「11號」
+- 「時越十二」→ 「12號」  
+- 「十月二六」→ 「26號」
+- 「五號十二號」→ 「5號、12號」
+
+範例轉換：
+輸入「十月十一 時越十二 十月二六」
+→ {"intent":"specific_dates","confidence":0.9,"correctedText":"11號、12號、26號","explanation":"語音錯誤修正：時越=十月，統一格式"}
+
+輸入「五號十二號十九號」  
+→ {"intent":"specific_dates","confidence":0.95,"correctedText":"5號、12號、19號","explanation":"統一日期格式"}
+
+輸入「前三個週六」
+→ {"intent":"select_dates","confidence":0.9,"correctedText":"前3個週六","explanation":"標準化數字格式"}
+
+輸入「所有週六」
+→ {"intent":"all_saturdays","confidence":0.95,"correctedText":"所有週六","explanation":"選擇所有週六"}
+
+請特別注意媽媽的語音輸入特點並提供準確的理解！`;
 
     case 'video_choice':
       return basePrompt + `
 
 可能的意圖類型：
-- "use_default": 使用常用影片（「常用」、「預設」、「常用影片」等）
-- "upload_new": 上傳新影片（「新影片」、「上傳」、「新的」等）
+- "use_default": 使用常用影片（「常用」、「預設」、「原本的」等）
+- "upload_new": 上傳新影片（「新影片」、「上傳」、「新的」、「換」等）
 - "unclear": 無法確定選擇
 
 範例：
-輸入「常用的」→ {"intent":"use_default","confidence":0.9,"correctedText":"常用影片","explanation":"選擇使用常用影片"}`;
+輸入「常用的」→ {"intent":"use_default","confidence":0.9,"correctedText":"常用影片","explanation":"選擇使用常用影片"}
+輸入「換新的」→ {"intent":"upload_new","confidence":0.9,"correctedText":"上傳新影片","explanation":"要上傳新影片"}`;
+
+    case 'modification':
+      return basePrompt + `
+
+用戶想要修改申請資訊，可能的意圖：
+- "modify_date": 修改日期（「改日期」、「換日期」、「重選日期」等）
+- "modify_video": 修改影片（「改影片」、「換影片」、「上傳新影片」等）
+- "modify_general": 不確定要改什麼（「修改」、「改」等）
+- "cancel": 取消申請（「取消」、「不要了」、「算了」等）
+- "unclear": 無法理解
+
+範例：
+輸入「改日期」→ {"intent":"modify_date","confidence":0.95,"correctedText":"修改日期","explanation":"要修改申請日期"}
+輸入「換影片」→ {"intent":"modify_video","confidence":0.95,"correctedText":"修改影片","explanation":"要更換表演影片"}`;
 
     default:
       return basePrompt + `
@@ -358,6 +395,54 @@ function matchDateSelectionKeywords(input, keywords) {
         source: 'fallback'
       };
     }
+  }
+  
+  // Phase 3: 特定日期選擇
+  if (input.includes('週六') || input.includes('周六')) {
+    if (input.includes('所有') || input.includes('全部')) {
+      return {
+        intent: 'all_saturdays',
+        confidence: 0.9,
+        correctedText: '所有週六',
+        explanation: '選擇所有週六',
+        source: 'fallback'
+      };
+    }
+    // 前N個週六
+    const match = input.match(/前(\d+)個?週六/);
+    if (match) {
+      return {
+        intent: 'select_dates',
+        confidence: 0.85,
+        correctedText: `前${match[1]}個週六`,
+        explanation: '選擇特定數量週六',
+        source: 'fallback'
+      };
+    }
+  }
+  
+  // 週日選擇
+  if (input.includes('週日') || input.includes('周日')) {
+    if (input.includes('所有') || input.includes('全部')) {
+      return {
+        intent: 'all_sundays',
+        confidence: 0.9,
+        correctedText: '所有週日',
+        explanation: '選擇所有週日',
+        source: 'fallback'
+      };
+    }
+  }
+  
+  // 具體日期（如「5號」）
+  if (input.match(/\d{1,2}[號日]/)) {
+    return {
+      intent: 'specific_dates',
+      confidence: 0.75,
+      correctedText: input,
+      explanation: '選擇特定日期',
+      source: 'fallback'
+    };
   }
   
   return {

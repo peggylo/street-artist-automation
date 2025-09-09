@@ -1,0 +1,391 @@
+/**
+ * 街頭藝人申請系統 - 日期計算工具
+ * Phase 3: 狀態管理與時間日期邏輯
+ */
+
+/**
+ * 檢查當前是否在申請時間窗口內（每月1-15日）
+ * @return {Object} {isOpen: boolean, message: string, nextMonth: string}
+ */
+function checkApplicationWindow() {
+  const now = new Date();
+  const currentDay = now.getDate();
+  const currentMonth = now.getMonth() + 1; // JavaScript 月份從0開始
+  const currentYear = now.getFullYear();
+  
+  const config = CONFIG.PHASE3.APPLICATION_WINDOW;
+  const isOpen = currentDay >= config.START_DAY && currentDay <= config.END_DAY;
+  
+  if (isOpen) {
+    // 計算可申請的月份
+    const targetMonths = getAvailableMonths();
+    return {
+      isOpen: true,
+      message: `現在可以申請 ${targetMonths.map(m => m.display).join(' 或 ')}`,
+      targetMonths: targetMonths
+    };
+  } else {
+    // 計算下次開放時間
+    let nextOpenDate;
+    if (currentDay > config.END_DAY) {
+      // 本月已過期，下月1日開放
+      nextOpenDate = new Date(currentYear, currentMonth, 1); // 注意：這裡月份不用減1
+    } else {
+      // 本月還未開始
+      nextOpenDate = new Date(currentYear, currentMonth - 1, 1);
+    }
+    
+    return {
+      isOpen: false,
+      message: `申請時間為每月 ${config.START_DAY}-${config.END_DAY} 日\n下次開放：${formatDate(nextOpenDate)}`,
+      nextOpenDate: nextOpenDate
+    };
+  }
+}
+
+/**
+ * 取得可申請的月份
+ * @return {Array} 可申請的月份陣列 [{month: 10, year: 2025, display: "10月"}]
+ */
+function getAvailableMonths() {
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0-11
+  const currentYear = now.getFullYear();
+  const currentDay = now.getDate();
+  
+  const config = CONFIG.PHASE3.APPLICATION_WINDOW;
+  const months = [];
+  
+  // 根據當前日期決定可申請的月份
+  if (currentDay >= config.START_DAY && currentDay <= config.END_DAY) {
+    // 在申請窗口內，可申請未來1-2個月
+    for (let i = 1; i <= config.ADVANCE_MONTHS; i++) {
+      const targetDate = new Date(currentYear, currentMonth + i, 1);
+      months.push({
+        month: targetDate.getMonth() + 1,
+        year: targetDate.getFullYear(),
+        display: `${targetDate.getMonth() + 1}月`
+      });
+    }
+  }
+  
+  return months;
+}
+
+/**
+ * 取得指定月份的週六日期
+ * @param {number} year - 年份
+ * @param {number} month - 月份 (1-12)
+ * @param {number} count - 要取得的週六數量（預設全部）
+ * @return {Array} 週六日期陣列 [{date: 5, day: "六", display: "10/5(六)"}]
+ */
+function getSaturdays(year, month, count = 0) {
+  const saturdays = [];
+  const daysInMonth = new Date(year, month, 0).getDate(); // 取得該月天數
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month - 1, day);
+    if (date.getDay() === 6) { // 6 = 星期六
+      saturdays.push({
+        date: day,
+        day: '六',
+        display: `${month}/${day}(六)`,
+        fullDate: date
+      });
+    }
+  }
+  
+  // 如果指定數量，返回前N個
+  if (count > 0) {
+    return saturdays.slice(0, count);
+  }
+  
+  return saturdays;
+}
+
+/**
+ * 取得指定月份的週日日期
+ * @param {number} year - 年份
+ * @param {number} month - 月份 (1-12)
+ * @param {number} count - 要取得的週日數量（預設全部）
+ * @return {Array} 週日日期陣列
+ */
+function getSundays(year, month, count = 0) {
+  const sundays = [];
+  const daysInMonth = new Date(year, month, 0).getDate();
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month - 1, day);
+    if (date.getDay() === 0) { // 0 = 星期日
+      sundays.push({
+        date: day,
+        day: '日',
+        display: `${month}/${day}(日)`,
+        fullDate: date
+      });
+    }
+  }
+  
+  if (count > 0) {
+    return sundays.slice(0, count);
+  }
+  
+  return sundays;
+}
+
+/**
+ * 取得預設申請日期（前3個週六）
+ * @param {number} targetMonth - 目標月份 (1-12)
+ * @param {number} targetYear - 目標年份
+ * @return {Object} 預設日期資訊
+ */
+function getDefaultDates(targetMonth, targetYear) {
+  const config = CONFIG.PHASE3.DEFAULTS;
+  const saturdays = getSaturdays(targetYear, targetMonth, config.SATURDAY_COUNT);
+  
+  return {
+    month: targetMonth,
+    year: targetYear,
+    dates: saturdays,
+    display: saturdays.map(s => s.display).join('、'),
+    description: `${targetMonth}月份前${config.SATURDAY_COUNT}個週六`
+  };
+}
+
+/**
+ * 解析用戶輸入的日期選擇（基礎版）
+ * @param {string} userInput - 用戶輸入
+ * @param {number} targetMonth - 目標月份
+ * @param {number} targetYear - 目標年份
+ * @return {Object} 解析結果
+ */
+function parseDateSelection(userInput, targetMonth, targetYear) {
+  // 使用增強版解析
+  return parseDateSelectionEnhanced(userInput, targetMonth, targetYear);
+}
+
+/**
+ * 增強版日期解析（支援中文數字和更多格式）
+ * @param {string} userInput - 用戶輸入
+ * @param {number} targetMonth - 目標月份
+ * @param {number} targetYear - 目標年份
+ * @return {Object} 解析結果
+ */
+function parseDateSelectionEnhanced(userInput, targetMonth, targetYear) {
+  const input = normalizeChineseNumbers(userInput.toLowerCase());
+  const result = {
+    success: false,
+    dates: [],
+    message: ''
+  };
+  
+  // 解析「前N個週六」
+  const frontSaturdayMatch = input.match(/前(\d+)個?週[六6]/);
+  if (frontSaturdayMatch) {
+    const count = parseInt(frontSaturdayMatch[1]);
+    const saturdays = getSaturdays(targetYear, targetMonth, count);
+    result.success = true;
+    result.dates = saturdays;
+    result.message = `已選擇前${count}個週六`;
+    return result;
+  }
+  
+  // 解析「後N個週六」
+  const backSaturdayMatch = input.match(/[後后](\d+)個?週[六6]/);
+  if (backSaturdayMatch) {
+    const count = parseInt(backSaturdayMatch[1]);
+    const saturdays = getSaturdays(targetYear, targetMonth);
+    const lastSaturdays = saturdays.slice(-count);
+    result.success = true;
+    result.dates = lastSaturdays;
+    result.message = `已選擇後${count}個週六`;
+    return result;
+  }
+  
+  // 解析「前N個週日」
+  const frontSundayMatch = input.match(/前(\d+)個?週[日0]/);
+  if (frontSundayMatch) {
+    const count = parseInt(frontSundayMatch[1]);
+    const sundays = getSundays(targetYear, targetMonth, count);
+    result.success = true;
+    result.dates = sundays;
+    result.message = `已選擇前${count}個週日`;
+    return result;
+  }
+  
+  // 解析「後N個週日」
+  const backSundayMatch = input.match(/[後后](\d+)個?週[日0]/);
+  if (backSundayMatch) {
+    const count = parseInt(backSundayMatch[1]);
+    const sundays = getSundays(targetYear, targetMonth);
+    const lastSundays = sundays.slice(-count);
+    result.success = true;
+    result.dates = lastSundays;
+    result.message = `已選擇後${count}個週日`;
+    return result;
+  }
+  
+  // 解析「所有週六」
+  if (input.includes('所有週六') || input.includes('全部週六') || input.includes('每個週六')) {
+    const saturdays = getSaturdays(targetYear, targetMonth);
+    result.success = true;
+    result.dates = saturdays;
+    result.message = `已選擇所有週六（共${saturdays.length}天）`;
+    return result;
+  }
+  
+  // 解析「所有週日」
+  if (input.includes('所有週日') || input.includes('全部週日') || input.includes('每個週日')) {
+    const sundays = getSundays(targetYear, targetMonth);
+    result.success = true;
+    result.dates = sundays;
+    result.message = `已選擇所有週日（共${sundays.length}天）`;
+    return result;
+  }
+  
+  // 解析具體日期（支援多種格式）
+  // 支援：5號、5日、五號、五日、5、五
+  const datePattern = /(\d{1,2})[號号日]?/g;
+  const matches = [...input.matchAll(datePattern)];
+  if (matches.length > 0) {
+    const selectedDates = [];
+    const addedDays = new Set(); // 避免重複
+    
+    for (const match of matches) {
+      const day = parseInt(match[1]);
+      if (day >= 1 && day <= 31 && !addedDays.has(day)) {
+        addedDays.add(day);
+        const date = new Date(targetYear, targetMonth - 1, day);
+        const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+        selectedDates.push({
+          date: day,
+          day: dayOfWeek,
+          display: `${targetMonth}/${day}(${dayOfWeek})`,
+          fullDate: date
+        });
+      }
+    }
+    
+    if (selectedDates.length > 0) {
+      // 按日期排序
+      selectedDates.sort((a, b) => a.date - b.date);
+      result.success = true;
+      result.dates = selectedDates;
+      result.message = `已選擇 ${selectedDates.map(d => d.display).join('、')}`;
+      return result;
+    }
+  }
+  
+  // 無法解析
+  result.message = '無法理解您的日期選擇，請重新說明';
+  return result;
+}
+
+/**
+ * 正規化中文數字為阿拉伯數字
+ * @param {string} text - 輸入文字
+ * @return {string} 轉換後的文字
+ */
+function normalizeChineseNumbers(text) {
+  const chineseNumbers = {
+    '零': '0', '一': '1', '二': '2', '三': '3', '四': '4',
+    '五': '5', '六': '6', '七': '7', '八': '8', '九': '9',
+    '十': '10', '十一': '11', '十二': '12', '十三': '13', '十四': '14',
+    '十五': '15', '十六': '16', '十七': '17', '十八': '18', '十九': '19',
+    '二十': '20', '二十一': '21', '二十二': '22', '二十三': '23', '二十四': '24',
+    '二十五': '25', '二十六': '26', '二十七': '27', '二十八': '28', '二十九': '29',
+    '三十': '30', '三十一': '31',
+    '兩': '2', '倆': '2' // 常見變體
+  };
+  
+  let result = text;
+  
+  // 替換中文數字
+  for (const [chinese, arabic] of Object.entries(chineseNumbers)) {
+    result = result.replace(new RegExp(chinese, 'g'), arabic);
+  }
+  
+  // 處理特殊情況：「十」開頭但不是完整數字的情況
+  // 例如：「十號」→「10號」
+  result = result.replace(/(?<![一二三四五六七八九])十(?![一二三四五六七八九])/g, '10');
+  
+  return result;
+}
+
+/**
+ * 格式化日期顯示
+ * @param {Date} date - 日期物件
+ * @return {string} 格式化的日期字串
+ */
+function formatDate(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+  
+  return `${year}年${month}月${day}日(${dayOfWeek})`;
+}
+
+/**
+ * 取得所有可選日期（週六和週日）
+ * @param {number} year - 年份
+ * @param {number} month - 月份
+ * @return {Object} 包含週六和週日的日期資訊
+ */
+function getAllAvailableDates(year, month) {
+  const saturdays = getSaturdays(year, month);
+  const sundays = getSundays(year, month);
+  
+  return {
+    saturdays: saturdays,
+    sundays: sundays,
+    saturdayDisplay: saturdays.map(s => s.display).join('、'),
+    sundayDisplay: sundays.map(s => s.display).join('、'),
+    allDates: [...saturdays, ...sundays].sort((a, b) => a.date - b.date)
+  };
+}
+
+/**
+ * 測試日期工具函數
+ */
+function testDateUtils() {
+  console.log('🧪 測試日期工具...');
+  
+  // 測試申請窗口
+  console.log('1. 測試申請窗口檢查');
+  const windowCheck = checkApplicationWindow();
+  console.log('申請窗口狀態:', windowCheck);
+  
+  // 測試可申請月份
+  console.log('\n2. 測試可申請月份');
+  const availableMonths = getAvailableMonths();
+  console.log('可申請月份:', availableMonths);
+  
+  // 測試週六日期
+  if (availableMonths.length > 0) {
+    const firstMonth = availableMonths[0];
+    console.log(`\n3. 測試 ${firstMonth.display} 的週六`);
+    const saturdays = getSaturdays(firstMonth.year, firstMonth.month, 3);
+    console.log('前3個週六:', saturdays);
+    
+    // 測試預設日期
+    console.log('\n4. 測試預設日期');
+    const defaults = getDefaultDates(firstMonth.month, firstMonth.year);
+    console.log('預設日期:', defaults);
+    
+    // 測試日期解析
+    console.log('\n5. 測試日期解析');
+    const testCases = [
+      '前2個週六',
+      '所有週日',
+      '5號、12號、19號'
+    ];
+    
+    testCases.forEach(testCase => {
+      const parsed = parseDateSelection(testCase, firstMonth.month, firstMonth.year);
+      console.log(`輸入「${testCase}」:`, parsed.message);
+    });
+  }
+  
+  console.log('\n✅ 日期工具測試完成');
+}
