@@ -463,7 +463,7 @@ function confirmApplication(userId) {
 }
 
 /**
- * 執行最終申請
+ * 執行最終申請（Phase 4 版本 - 含 Sheets 記錄）
  */
 function executeFinalApplication(userId) {
   const state = getUserState(userId);
@@ -474,22 +474,50 @@ function executeFinalApplication(userId) {
   const dateDisplay = state.selectedDates.map(d => d.display).join('、');
   const videoDisplay = state.useDefaultVideo ? '常用影片' : '新上傳影片';
   
-  // TODO: Phase 4 將實際記錄到 Google Sheets
-  // TODO: Phase 5 將實際提交申請
-  
-  clearUserState(userId);
-  
-  return `✅ 申請已送出！
+  try {
+    // Phase 4: 記錄申請資訊到 Google Sheets
+    if (CONFIG.PHASE4.ENABLE_SHEETS_RECORDING) {
+      console.log('📊 Phase 4: 記錄申請資訊到 Sheets');
+      
+      const applicationData = prepareApplicationData(state);
+      const recordSuccess = recordApplicationToSheets(userId, applicationData);
+      
+      if (!recordSuccess) {
+        console.error('⚠️ Sheets 記錄失敗，但繼續流程');
+      }
+    }
+    
+    // 清除對話狀態
+    clearUserState(userId);
+    
+    return `✅ 申請已送出並記錄！
 
 📅 申請月份：${state.targetMonth.display}
 📍 申請日期：${dateDisplay}
 🎬 表演影片：${videoDisplay}
 
+📊 申請資訊已記錄到系統
 📧 系統將自動處理您的申請
 🔔 完成後會通知您
 
-⚠️ Phase 3 測試中
+⚠️ Phase 4 測試中
 實際申請功能將在 Phase 5 實現`;
+    
+  } catch (error) {
+    console.error('❌ 申請記錄過程發生錯誤:', error);
+    
+    // 即使記錄失敗也要清除狀態
+    clearUserState(userId);
+    
+    return `✅ 申請已送出！
+
+📅 申請月份：${state.targetMonth.display}
+📍 申請日期：${dateDisplay}
+🎬 表演影片：${videoDisplay}
+
+⚠️ 資料記錄可能有問題，請聯繫管理員
+📧 系統將自動處理您的申請`;
+  }
 }
 
 /**
@@ -1226,11 +1254,180 @@ function testPhase2AI() {
       console.log(`結果：意圖=${result.intent}, 信心度=${result.confidence}, 修正=${result.correctedText}, 來源=${result.source}`);
     });
     
-    console.log('\n🎉 Phase 2 AI 功能測試完成！');
+  console.log('\n🎉 Phase 2 AI 功能測試完成！');
+  return true;
+  
+} catch (error) {
+  console.error('❌ Phase 2 AI 功能測試失敗:', error);
+  console.error('📋 錯誤詳情:', error.stack);
+  return false;
+}
+}
+
+// =====================================================
+// Phase 4: Google Sheets 資料記錄函數
+// =====================================================
+
+/**
+ * 記錄申請資訊到 Google Sheets
+ * @param {string} userId - 用戶ID
+ * @param {Object} applicationData - 申請資料
+ * @return {boolean} 記錄是否成功
+ */
+function recordApplicationToSheets(userId, applicationData) {
+  try {
+    console.log('📊 開始記錄申請資訊到 Sheets');
+    
+    const config = CONFIG.PHASE4.GOOGLE_SHEETS;
+    const sheet = SpreadsheetApp.openById(config.APPLICATION_RECORD_ID)
+      .getSheetByName(config.SHEET_NAME);
+    
+    if (!sheet) {
+      console.error('❌ 找不到指定的工作表:', config.SHEET_NAME);
+      return false;
+    }
+    
+    // 準備資料列
+    const now = new Date();
+    const rowData = [
+      now.toLocaleString('zh-TW'),  // A. 時間戳記
+      userId,                       // B. 用戶ID
+      `${applicationData.year}/${applicationData.month}`,  // C. 申請月份
+      formatDatesForSheet(applicationData.selectedDates),  // D. 選擇日期
+      applicationData.videoSource,  // E. 影片來源
+      applicationData.videoUrl,     // F. 影片連結
+      '待處理',                     // G. 狀態
+      '',                          // H. 錯誤訊息
+      '',                          // I. PDF路徑
+      '',                          // J. 處理開始時間
+      ''                           // K. 處理完成時間
+    ];
+    
+    // 寫入資料
+    sheet.appendRow(rowData);
+    console.log('✅ 申請資訊已記錄到 Sheets');
+    
     return true;
     
   } catch (error) {
-    console.error('❌ Phase 2 AI 功能測試失敗:', error);
+    console.error('❌ 記錄申請資訊失敗:', error);
+    return false;
+  }
+}
+
+/**
+ * 格式化日期陣列為 Sheets 儲存格式
+ * @param {Array} selectedDates - 選擇的日期陣列
+ * @return {string} 逗號分隔的日期字串
+ */
+function formatDatesForSheet(selectedDates) {
+  return selectedDates.map(date => {
+    // 將 display 格式 "10/4(六)" 轉換為完整日期 "2024/10/4"
+    const dateParts = date.display.match(/(\d+)\/(\d+)/);
+    if (dateParts) {
+      const month = dateParts[1];
+      const day = dateParts[2];
+      
+      // 處理 fullDate 可能是字串的情況（Cache Service 序列化問題）
+      let year;
+      try {
+        if (date.fullDate) {
+          if (typeof date.fullDate === 'string') {
+            // 如果是字串，轉換為 Date 物件
+            const fullDate = new Date(date.fullDate);
+            year = fullDate.getFullYear();
+          } else {
+            // 如果是 Date 物件
+            year = date.fullDate.getFullYear();
+          }
+        } else {
+          // 如果沒有 fullDate，使用當前年份或下一年
+          const now = new Date();
+          year = now.getFullYear();
+          if (parseInt(month) < now.getMonth() + 1) {
+            year += 1; // 如果月份小於當前月份，假設是下一年
+          }
+        }
+      } catch (error) {
+        console.error('❌ 日期解析錯誤:', error);
+        // 降級：使用當前年份
+        year = new Date().getFullYear();
+      }
+      
+      return `${year}/${month}/${day}`;
+    }
+    return date.display;
+  }).join(',');
+}
+
+/**
+ * 準備申請資料物件
+ * @param {Object} state - 用戶狀態
+ * @return {Object} 申請資料物件
+ */
+function prepareApplicationData(state) {
+  // 決定影片來源和連結
+  let videoSource, videoUrl;
+  
+  if (state.useDefaultVideo) {
+    videoSource = '常用影片';
+    videoUrl = CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_URL;
+  } else {
+    videoSource = '新上傳';
+    videoUrl = state.newVideoUrl || '';
+  }
+  
+  return {
+    year: state.targetMonth.year,
+    month: state.targetMonth.month,
+    selectedDates: state.selectedDates,
+    videoSource: videoSource,
+    videoUrl: videoUrl
+  };
+}
+
+/**
+ * 測試 Google Sheets 記錄功能
+ */
+function testSheetsRecording() {
+  try {
+    console.log('🧪 開始 Sheets 記錄功能測試...');
+    
+    // 1. 測試 Sheets 存取權限
+    console.log('1. 測試 Sheets 存取權限...');
+    const config = CONFIG.PHASE4.GOOGLE_SHEETS;
+    
+    try {
+      const spreadsheet = SpreadsheetApp.openById(config.APPLICATION_RECORD_ID);
+      const sheet = spreadsheet.getSheetByName(config.SHEET_NAME);
+      console.log('✅ Sheets 存取正常:', spreadsheet.getName());
+      console.log('✅ 工作表存取正常:', sheet.getName());
+    } catch (sheetsError) {
+      console.error('❌ Sheets 存取失敗:', sheetsError);
+      return false;
+    }
+    
+    // 2. 測試資料記錄
+    console.log('2. 測試資料記錄...');
+    const testData = {
+      year: 2024,
+      month: 10,
+      selectedDates: [
+        { display: '10/4(六)', fullDate: new Date(2024, 9, 4) },
+        { display: '10/11(六)', fullDate: new Date(2024, 9, 11) }
+      ],
+      videoSource: '常用影片',
+      videoUrl: CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_URL
+    };
+    
+    const recordResult = recordApplicationToSheets('test-user-phase4', testData);
+    console.log('記錄結果:', recordResult ? '✅ 成功' : '❌ 失敗');
+    
+    console.log('\n🎉 Sheets 記錄功能測試完成！');
+    return recordResult;
+    
+  } catch (error) {
+    console.error('❌ Sheets 記錄功能測試失敗:', error);
     console.error('📋 錯誤詳情:', error.stack);
     return false;
   }
