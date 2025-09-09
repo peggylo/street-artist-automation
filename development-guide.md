@@ -1,5 +1,34 @@
 # 街頭藝人申請系統開發指南
 
+## 📁 專案檔案結構
+
+### GAS專案檔案結構
+```
+街頭藝人申請系統 (GAS專案)
+├── Code.gs                 # 主要邏輯、Webhook、狀態管理、影片處理 [Phase 1-4]
+├── LineHandler.gs          # LINE API 相關函數 [Phase 1]
+├── Config.gs               # 設定和常數 [Phase 1-4]
+├── OpenAIHandler.gs        # OpenAI API 處理 [Phase 2]
+├── DateUtils.gs            # 日期計算工具 [Phase 3]
+└── (Phase 5+ 檔案將根據需要新增)
+```
+
+### 本地備份檔案結構
+```
+code/gas/
+├── Code.js                 # Code.gs 備份（主要邏輯、狀態管理、影片處理、Sheets記錄）
+├── LineHandler.js          # LineHandler.gs 備份
+├── Config.js               # Config.gs 備份（透過git ignore保護敏感資訊）
+├── OpenAIHandler.js        # OpenAIHandler.gs 備份
+├── DateUtils.js            # DateUtils.gs 備份
+└── (Phase 5+ 檔案備份將根據需要新增)
+```
+
+### 檔案結構設計原則
+- **最小化原則**：避免過度設計，功能簡單的直接放在 Code.js
+- **獨立性原則**：複雜功能（如OpenAI、DateUtils）獨立成檔案
+- **判斷標準**：複雜度 > 200行 + 獨立性強 → 獨立檔案
+
 ## 🚀 開發階段規劃
 
 ### Phase 1: 基礎LINE Bot架構 (1-2週)
@@ -14,29 +43,6 @@
 - **API Keys存放**：使用 PropertiesService
 - **開發策略**：完整檔案結構開發（避免後續重構）
 
-#### 📁 GAS專案檔案結構
-```
-街頭藝人申請系統 (GAS專案)
-├── Code.gs                 # 主要邏輯和 Webhook 處理 [Phase 1]
-├── LineHandler.gs          # LINE API 相關函數 [Phase 1]
-├── Config.gs               # 設定和常數 [Phase 1]
-├── OpenAIHandler.gs        # OpenAI API 處理 [Phase 2]
-├── DateUtils.gs            # 日期計算工具 [Phase 3]
-├── SheetsHandler.gs        # Google Sheets 操作 [Phase 4]
-└── DriveHandler.gs         # Google Drive 操作 [Phase 4]
-```
-
-#### 📁 本地備份檔案結構
-```
-code/gas/
-├── Code.js                 # Code.gs 備份 [Phase 1] ✅
-├── LineHandler.js          # LineHandler.gs 備份 [Phase 1] ✅
-├── Config.js               # Config.gs 備份（與GAS相同，透過git ignore保護）[Phase 1] ✅
-├── OpenAIHandler.js        # OpenAIHandler.gs 備份 [Phase 2]
-├── DateUtils.js            # DateUtils.gs 備份 [Phase 3]
-├── SheetsHandler.js        # SheetsHandler.gs 備份 [Phase 4]
-└── DriveHandler.js         # DriveHandler.gs 備份 [Phase 4]
-```
 
 #### 🎯 Phase 1 需要建立的檔案
 **GAS專案中**：
@@ -354,30 +360,78 @@ return analyzeWithAI(text);
 - **智能錯誤降級**：上傳失敗自動使用常用影片
 - **時間戳命名**：避免檔案衝突，保留所有版本
 
-### Phase 4: Google服務整合 (2週)
+### Phase 4: Google Sheets 資料記錄 (1週)
 
 #### 📋 Phase 4 範疇定義
 **Phase 4 專注於**：
-- **資料持久化**：使用 Google Sheets 記錄申請
-- **檔案管理**：使用 Google Drive 存放文件
-- **狀態追蹤**：申請進度管理
-- **用戶資料**：記錄用戶偏好和歷史
-#### 4.1 Google Sheets資料管理
-- [ ] 建立申請記錄表格結構
-- [ ] 實現Sheets API讀寫功能
-- [ ] 建立狀態管理機制（待處理→處理中→完成/失敗）
-- [ ] 實現用戶ID和名稱記錄
+- **申請資料持久化**：將申請資訊記錄到 Google Sheets
+- **狀態初始記錄**：記錄「待處理」狀態
+- **資料完整性**：確保所有申請資訊正確記錄
 
-#### 4.2 Google Drive檔案系統
-- [ ] 建立完整資料夾結構（證照/影片/申請文件）
-- [ ] 實現檔案上傳下載功能
-- [ ] 設定檔案權限（有連結者可檢視）
-- [ ] 實現影片上傳處理（常用影片+新上傳）
+#### 🎯 Phase 4 開發決策（2025年9月）
+
+**檔案結構（最小化原則）**：
+- 不新增檔案：Sheets 功能直接在 `Code.gs` 實現
+- 預期程式碼量：50-100行（相對簡單）
+- 與申請流程緊密結合，適合放在主檔案
+
+**Google Sheets 設定**：
+- Sheets ID: `1xZT5sqTTTrDxycPbJb9cuFPn59FY6m13srIkHYs3GdI`
+- 位置：街頭藝人登記/系統記錄/申請記錄
+- 權限：編輯權限僅限擁有者
+
+**資料記錄策略**：
+- **Phase 4 記錄**：「待處理」狀態
+- **Phase 5 更新**：「處理中」→「完成」或「失敗」
+- **用戶名稱**：不處理（LINE群組可看到操作者）
+
+#### 🎯 Phase 4 需要建立/修改的檔案
+**修改檔案**：
+- `Code.gs/Code.js` - 加入 Google Sheets 記錄功能
+- `Config.gs/Config.js` - 新增 Sheets ID 設定
+
+#### 4.1 Google Sheets 資料記錄
+- [ ] 建立申請記錄寫入功能
+- [ ] 實現 Sheets API 基本讀寫
+- [ ] 記錄完整申請資訊（日期、影片、狀態）
+- [ ] 初始狀態設為「待處理」
+
+#### 4.2 資料結構實作
+**Sheets 欄位結構**：
+```
+A. 時間戳記 (自動產生)
+B. 用戶ID (LINE userId)
+C. 申請月份 (2024/10)
+D. 選擇日期 (2024/10/4,2024/10/11,2024/10/18)
+E. 影片來源 (常用影片/新上傳)
+F. 影片連結 (Google Drive URL)
+G. 狀態 (待處理)
+H. 錯誤訊息 (空白)
+I. PDF路徑 (空白，Phase 5 填入)
+J. 處理開始時間 (空白，Phase 5 填入)
+K. 處理完成時間 (空白，Phase 5 填入)
+```
 
 #### 4.3 階段測試里程碑
-- [ ] ✅ 申請記錄能正確寫入Sheets
-- [ ] ✅ 影片檔案能成功上傳到Drive
-- [ ] ✅ 狀態更新機制運作正常
+- [ ] ✅ 申請記錄能正確寫入 Sheets
+- [ ] ✅ 資料格式正確（日期、影片連結等）
+- [ ] ✅ 狀態正確設為「待處理」
+- [ ] ✅ 完整申請流程含 Sheets 記錄
+
+#### 🎯 Phase 4 預期產出
+**功能實現**：
+- 申請完成時自動記錄到 Google Sheets ✅
+- 包含完整申請資訊和影片連結 ✅
+- 初始狀態為「待處理」✅
+- 為 Phase 5 的狀態更新做準備 ✅
+
+**程式碼更新**：
+- Code.js 新增 Sheets 記錄功能（約50-100行）✅
+- Config.js 新增 Sheets 相關設定 ✅
+
+**測試驗證**：
+- 完整申請流程 + Sheets 記錄成功 ✅
+- 資料格式和完整性驗證 ✅
 
 ### Phase 5: 文件處理和網站自動化 (2-3週)
 
