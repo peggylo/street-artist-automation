@@ -74,22 +74,13 @@ class DocumentProcessor:
         try:
             logger.info("開始下載 Word 模板")
             
-            # 搜尋模板檔案
-            folder_id = config.GOOGLE_DRIVE["TEMPLATE_FOLDER_ID"]
-            file_name = config.GOOGLE_DRIVE["TEMPLATE_FILE_NAME"]
-            
-            query = f"name='{file_name}' and parents in '{folder_id}'"
-            results = self.drive_service.files().list(q=query).execute()
-            files = results.get('files', [])
-            
-            if not files:
-                raise Exception(f"找不到模板檔案: {file_name}")
-            
-            file_id = files[0]['id']
-            logger.info(f"找到模板檔案: {file_id}")
+            # 直接使用模板檔案 ID（方案 B）
+            template_file_id = config.GOOGLE_DRIVE["TEMPLATE_WORD_FILE_ID"]
+            logger.info(f"使用 Word 模板檔案 ID: {template_file_id}")
             
             # 下載檔案
-            request = self.drive_service.files().get_media(fileId=file_id)
+            request = self.drive_service.files().get_media(fileId=template_file_id)
+            file_name = config.GOOGLE_DRIVE["TEMPLATE_FILE_NAME"]
             template_path = os.path.join(temp_dir, file_name)
             
             with open(template_path, 'wb') as f:
@@ -103,6 +94,45 @@ class DocumentProcessor:
             
         except Exception as e:
             logger.error(f"下載模板失敗: {str(e)}")
+            raise
+    
+    def download_copied_file(self, copied_file_id, temp_dir):
+        """
+        從 Google Drive 下載已複製的 Word 檔案（方案 B）
+        
+        Args:
+            copied_file_id (str): 已複製檔案的 ID
+            temp_dir (str): 臨時目錄路徑
+            
+        Returns:
+            str: 下載的檔案路徑
+        """
+        try:
+            logger.info(f"開始下載已複製的 Word 檔案: {copied_file_id}")
+            
+            # 取得檔案資訊
+            file_metadata = self.drive_service.files().get(fileId=copied_file_id).execute()
+            file_name = file_metadata.get('name', 'copied_template.docx')
+            
+            logger.info(f"檔案名稱: {file_name}")
+            
+            # 下載檔案內容
+            request = self.drive_service.files().get_media(fileId=copied_file_id)
+            
+            copied_file_path = os.path.join(temp_dir, file_name)
+            
+            with open(copied_file_path, 'wb') as copied_file:
+                downloader = MediaIoBaseDownload(copied_file, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
+                    logger.info(f"下載進度: {int(status.progress() * 100)}%")
+            
+            logger.info(f"已複製檔案下載完成: {copied_file_path}")
+            return copied_file_path
+            
+        except Exception as e:
+            logger.error(f"下載已複製檔案失敗: {str(e)}")
             raise
     
     def fill_template(self, template_path, application_data, output_path):
@@ -219,7 +249,7 @@ class DocumentProcessor:
     
     def upload_pdf(self, pdf_path, application_data):
         """
-        上傳 PDF 到 Google Drive
+        上傳 PDF 到 Google Drive（方案 B：覆蓋現有檔案）
         
         Args:
             pdf_path (str): PDF 檔案路徑
@@ -229,49 +259,72 @@ class DocumentProcessor:
             str: 上傳後的檔案連結
         """
         try:
-            logger.info("開始上傳 PDF 到 Google Drive")
+            # 檢查是否為方案 B（有 pdfFileId）
+            pdf_file_id = application_data.get("pdfFileId")
             
-            # 生成檔案名稱
-            year = application_data.get("year")
-            month = application_data.get("month")
-            
-            # 檢查必要參數
-            if not year or not month:
-                raise ValueError(f"缺少必要參數: year={year}, month={month}")
-            
-            filename = config.generate_pdf_filename(year, month)
-            
-            # 上傳檔案
-            folder_id = config.GOOGLE_DRIVE["GENERATED_FOLDER_ID"]
-            media = MediaFileUpload(pdf_path, mimetype='application/pdf')
-            
-            file_metadata = {
-                'name': filename,
-                'parents': [folder_id]
-            }
-            
-            file = self.drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id,webViewLink'
-            ).execute()
-            
-            file_id = file.get('id')
-            file_url = file.get('webViewLink')
-            
-            logger.info(f"PDF 上傳完成: {file_url}")
-            return file_url
+            if pdf_file_id:
+                logger.info(f"方案 B: 覆蓋現有 PDF 檔案 {pdf_file_id}")
+                
+                # 覆蓋現有檔案
+                media = MediaFileUpload(pdf_path, mimetype='application/pdf')
+                
+                file = self.drive_service.files().update(
+                    fileId=pdf_file_id,
+                    media_body=media,
+                    fields='id,webViewLink'
+                ).execute()
+                
+                file_id = file.get('id')
+                file_url = file.get('webViewLink')
+                
+                logger.info(f"PDF 覆蓋完成: {file_url}")
+                return file_url
+                
+            else:
+                logger.info("方案 A: 建立新 PDF 檔案")
+                
+                # 生成檔案名稱
+                year = application_data.get("year")
+                month = application_data.get("month")
+                
+                # 檢查必要參數
+                if not year or not month:
+                    raise ValueError(f"缺少必要參數: year={year}, month={month}")
+                
+                filename = config.generate_pdf_filename(year, month)
+                
+                # 建立新檔案
+                folder_id = config.GOOGLE_DRIVE["GENERATED_FOLDER_ID"]
+                media = MediaFileUpload(pdf_path, mimetype='application/pdf')
+                
+                file_metadata = {
+                    'name': filename,
+                    'parents': [folder_id]
+                }
+                
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id,webViewLink'
+                ).execute()
+                
+                file_id = file.get('id')
+                file_url = file.get('webViewLink')
+                
+                logger.info(f"PDF 上傳完成: {file_url}")
+                return file_url
             
         except Exception as e:
             logger.error(f"PDF 上傳失敗: {str(e)}")
             raise
     
-    def update_sheets_status(self, user_id, pdf_url, status="完成", error_message=""):
+    def update_sheets_status(self, user_id, application_data, pdf_url, status="完成", error_message=""):
         """
         更新 Google Sheets 狀態
         
         Args:
             user_id (str): 用戶 ID
+            application_data (dict): 申請資料（包含時間戳記）
             pdf_url (str): PDF 檔案連結
             status (str): 狀態
             error_message (str): 錯誤訊息
@@ -291,26 +344,42 @@ class DocumentProcessor:
             
             values = result.get('values', [])
             
-            # 找到最新的待處理記錄
+            # 改用時間戳記找到精確的記錄
             target_row = None
-            for i, row in enumerate(values):
-                if len(row) > 1 and row[1] == user_id and len(row) > 6 and row[6] == "待處理":
-                    target_row = i + 1  # Sheets 行號從 1 開始
-                    break
+            target_timestamp = application_data.get("timestamp")
+            
+            if not target_timestamp:
+                # 向後相容：如果沒有時間戳記，回退到原來的邏輯
+                logger.warning("沒有時間戳記，使用 User ID 搜尋")
+                for i, row in enumerate(values):
+                    if len(row) > 1 and row[1] == user_id and len(row) > 6 and row[6] == "待處理":
+                        target_row = i + 1
+                        break
+            else:
+                # 用時間戳記精確搜尋
+                logger.info(f"使用時間戳記搜尋記錄: {target_timestamp}")
+                for i, row in enumerate(values):
+                    if len(row) > 0 and row[0] == target_timestamp:
+                        target_row = i + 1
+                        logger.info(f"找到匹配記錄在第 {target_row} 行")
+                        break
             
             if not target_row:
-                raise Exception(f"找不到用戶 {user_id} 的待處理記錄")
+                if target_timestamp:
+                    raise Exception(f"找不到時間戳記 {target_timestamp} 的申請記錄")
+                else:
+                    raise Exception(f"找不到用戶 {user_id} 的待處理記錄")
             
             # 更新狀態
             now = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
             update_data = []
             
             if status == "完成":
-                # 成功完成：更新 PDF路徑、狀態、處理完成時間
+                # 成功完成：更新狀態、錯誤訊息、PDF路徑、處理完成時間
                 update_data = [
-                    [pdf_url, status, "", now]  # I, G, H, K 欄位
+                    [status, "", pdf_url, now]  # G, H, I, K 欄位
                 ]
-                update_range = f"{sheet_name}!I{target_row}:K{target_row}"
+                update_range = f"{sheet_name}!G{target_row}:K{target_row}"
             else:
                 # 處理失敗：更新狀態、錯誤訊息
                 update_data = [
@@ -366,36 +435,65 @@ def process_application():
             return jsonify({"error": "缺少申請資料"}), 400
         
         user_id = application_data.get("user_id")
-        if not user_id:
-            return jsonify({"error": "缺少用戶ID"}), 400
+        timestamp = application_data.get("timestamp")
         
         # 提取申請資料
         app_data = application_data.get("application_data")
         if not app_data:
             return jsonify({"error": "缺少申請資料"}), 400
         
-        logger.info(f"開始處理申請: 用戶 {user_id}")
+        # 將時間戳記加入申請資料中，供 update_sheets_status 使用
+        app_data["timestamp"] = timestamp
+        
+        logger.info(f"開始處理申請: 用戶 {user_id}, 時間戳記: {timestamp}")
         logger.info(f"申請資料: {app_data}")
         
-        # 建立臨時目錄
-        with tempfile.TemporaryDirectory() as temp_dir:
-            logger.info(f"使用臨時目錄: {temp_dir}")
+        # 檢查是否為方案 B（GAS 複製 + Cloud Run 編輯）
+        copied_file_id = app_data.get("copiedFileId")
+        if copied_file_id:
+            logger.info(f"使用方案 B: 編輯已複製檔案 {copied_file_id}")
             
-            # 1. 下載模板
-            template_path = doc_processor.download_template(temp_dir)
+            # 建立臨時目錄
+            with tempfile.TemporaryDirectory() as temp_dir:
+                logger.info(f"使用臨時目錄: {temp_dir}")
+                
+                # 1. 下載已複製的 Word 檔案
+                copied_word_path = doc_processor.download_copied_file(copied_file_id, temp_dir)
+                
+                # 2. 填寫模板
+                filled_word_path = os.path.join(temp_dir, "filled_template.docx")
+                doc_processor.fill_template(copied_word_path, app_data, filled_word_path)
+                
+                # 3. 轉換為 PDF
+                pdf_path = doc_processor.convert_to_pdf(filled_word_path, temp_dir)
+                
+                # 4. 上傳 PDF
+                pdf_url = doc_processor.upload_pdf(pdf_path, app_data)
+                
+                # 5. 更新 Sheets 狀態
+                doc_processor.update_sheets_status(user_id, app_data, pdf_url, "完成")
+        else:
+            logger.info("使用方案 A: 下載模板檔案")
             
-            # 2. 填寫模板
-            filled_word_path = os.path.join(temp_dir, "filled_template.docx")
-            doc_processor.fill_template(template_path, app_data, filled_word_path)
-            
-            # 3. 轉換為 PDF
-            pdf_path = doc_processor.convert_to_pdf(filled_word_path, temp_dir)
-            
-            # 4. 上傳 PDF
-            pdf_url = doc_processor.upload_pdf(pdf_path, app_data)
-            
-            # 5. 更新 Sheets 狀態
-            doc_processor.update_sheets_status(user_id, pdf_url, "完成")
+            # 建立臨時目錄
+            with tempfile.TemporaryDirectory() as temp_dir:
+                logger.info(f"使用臨時目錄: {temp_dir}")
+                
+                # 1. 下載模板
+                template_path = doc_processor.download_template(temp_dir)
+                
+                # 2. 填寫模板
+                filled_word_path = os.path.join(temp_dir, "filled_template.docx")
+                doc_processor.fill_template(template_path, app_data, filled_word_path)
+                
+                # 3. 轉換為 PDF
+                pdf_path = doc_processor.convert_to_pdf(filled_word_path, temp_dir)
+                
+                # 4. 上傳 PDF
+                pdf_url = doc_processor.upload_pdf(pdf_path, app_data)
+                
+                # 5. 更新 Sheets 狀態
+                doc_processor.update_sheets_status(user_id, app_data, pdf_url, "完成")
         
         logger.info(f"申請處理完成: 用戶 {user_id}")
         
@@ -412,7 +510,8 @@ def process_application():
         # 更新失敗狀態
         try:
             user_id = application_data.get("user_id") if application_data else "unknown"
-            doc_processor.update_sheets_status(user_id, "", "失敗", str(e))
+            app_data = application_data.get("application_data", {}) if application_data else {}
+            doc_processor.update_sheets_status(user_id, app_data, "", "失敗", str(e))
         except:
             pass  # 避免二次錯誤
         

@@ -488,22 +488,45 @@ function executeFinalApplication(userId) {
       }
     }
     
-    // Phase 5: 自動呼叫 Cloud Run 處理文件
+    // Phase 5: 自動呼叫 Cloud Run 處理文件（方案 B：GAS 複製 + Cloud Run 編輯）
     let documentProcessingMessage = '';
     if (CONFIG.PHASE5.ENABLE_DOCUMENT_PROCESSING) {
-      console.log('🚀 Phase 5: 自動呼叫 Cloud Run 處理文件');
+      console.log('🚀 Phase 5: 自動呼叫 Cloud Run 處理文件（方案 B）');
       
       if (!applicationData) {
         applicationData = prepareApplicationData(state);
       }
       
-      const cloudRunResult = callCloudRunForDocumentProcessing(userId, applicationData);
+      // 步驟 1: GAS 複製 Word 模板
+      const copyResult = copyWordTemplate(applicationData);
       
-      if (cloudRunResult.success) {
-        documentProcessingMessage = '\n🔄 文件處理已啟動，系統正在生成 PDF';
+      if (copyResult.success) {
+        console.log('✅ 模板複製成功，開始呼叫 Cloud Run');
+        
+        // 步驟 2: 呼叫 Cloud Run，傳送複製檔案的 ID 和時間戳記
+        const cloudRunData = {
+          timestamp: applicationData.timestamp,  // 新增：用於精確識別記錄
+          user_id: userId,                       // 保留：向後相容
+          application_data: {
+            ...applicationData,
+            copiedFileId: copyResult.copiedFileId,
+            pdfFileId: copyResult.pdfFileId,
+            copiedFileName: copyResult.wordFileName,
+            pdfFileName: copyResult.pdfFileName
+          }
+        };
+        
+        const cloudRunResult = callCloudRunForDocumentProcessing(userId, cloudRunData);
+        
+        if (cloudRunResult.success) {
+          documentProcessingMessage = '\n🔄 文件處理已啟動，系統正在生成 PDF\n📄 Word 檔案：' + copyResult.wordFileName + '\n📄 PDF 檔案：' + copyResult.pdfFileName;
+        } else {
+          documentProcessingMessage = '\n⚠️ 文件處理啟動失敗，但檔案已準備\n📄 Word：' + copyResult.wordFileName + '\n📄 PDF：' + copyResult.pdfFileName;
+          console.error('❌ Cloud Run 呼叫失敗:', cloudRunResult.error);
+        }
       } else {
-        documentProcessingMessage = '\n⚠️ 文件處理啟動失敗，請稍後手動處理';
-        console.error('❌ Cloud Run 呼叫失敗:', cloudRunResult.error);
+        documentProcessingMessage = '\n❌ 模板複製失敗，無法啟動文件處理\n🔧 ' + copyResult.message;
+        console.error('❌ 模板複製失敗:', copyResult.message);
       }
     }
     
@@ -1565,5 +1588,70 @@ function testCloudRunConnection() {
   } catch (error) {
     console.error('❌ Cloud Run 連線測試失敗:', error);
     return false;
+  }
+}
+
+/**
+ * 複製 Word 模板檔案並建立 PDF 佔位檔案（Phase 5 方案 B）
+ * @param {Object} applicationData - 申請資料
+ * @return {Object} {success: boolean, copiedFileId: string, pdfFileId: string, message: string}
+ */
+function copyWordTemplate(applicationData) {
+  try {
+    console.log('📄 Phase 5: 複製 Word 模板檔案並建立 PDF 佔位檔案');
+    
+    const templateConfig = CONFIG.PHASE5.TEMPLATE;
+    const wordTemplateId = templateConfig.WORD_FILE_ID;
+    const pdfTemplateId = templateConfig.PDF_FILE_ID;
+    const generatedFolderId = templateConfig.GENERATED_FOLDER_ID;
+    
+    // 生成檔案名稱（包含時間戳記）
+    const now = new Date();
+    const year = applicationData.year;
+    const month = applicationData.month;
+    const monthStr = month.toString().padStart(2, '0');
+    const dayStr = now.getDate().toString().padStart(2, '0');
+    const hourStr = now.getHours().toString().padStart(2, '0');
+    const minuteStr = now.getMinutes().toString().padStart(2, '0');
+    
+    const baseFileName = `申請表_${year}年${monthStr}月_${monthStr}${dayStr}_${hourStr}${minuteStr}`;
+    const wordFileName = `${baseFileName}_待處理`;
+    const pdfFileName = `${baseFileName}`;
+    
+    console.log('📝 生成檔案名稱:', wordFileName, pdfFileName);
+    
+    // 取得模板檔案和目標資料夾
+    const wordTemplateFile = DriveApp.getFileById(wordTemplateId);
+    const pdfTemplateFile = DriveApp.getFileById(pdfTemplateId);
+    const generatedFolder = DriveApp.getFolderById(generatedFolderId);
+    
+    // 1. 複製 Word 檔案（方案 B：複製時就改名）
+    const copiedWordFile = wordTemplateFile.makeCopy(wordFileName, generatedFolder);
+    const copiedFileId = copiedWordFile.getId();
+    
+    // 2. 複製 PDF 檔案（方案 B：複製時就改名）
+    const copiedPdfFile = pdfTemplateFile.makeCopy(pdfFileName, generatedFolder);
+    const pdfFileId = copiedPdfFile.getId();
+    
+    console.log('✅ Word 複製成功:', copiedFileId);
+    console.log('✅ PDF 複製成功:', pdfFileId);
+    
+    return {
+      success: true,
+      copiedFileId: copiedFileId,
+      pdfFileId: pdfFileId,
+      wordFileName: wordFileName + '.docx',
+      pdfFileName: pdfFileName + '.pdf',
+      message: 'Word 模板和 PDF 模板複製成功'
+    };
+    
+  } catch (error) {
+    console.error('❌ 複製模板失敗:', error);
+    return {
+      success: false,
+      copiedFileId: null,
+      pdfFileId: null,
+      message: '模板複製失敗: ' + error.message
+    };
   }
 }

@@ -494,12 +494,13 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **標記方式**：`<url>`, `<date1>`, `<date2>`, `<date3>` 文字替換
 - **日期處理**：支援 1-3 個日期，空白處保持空白
 - **圖片保留**：印章圖片在文字替換和 PDF 轉換時自動保留
-- **檔案流程**：Google Drive 下載 → 文字替換 → PDF 轉換 → 上傳回 Drive
+- **檔案流程**：GAS 複製模板 → Cloud Run 編輯複製檔案 → 文字替換 → PDF 轉換 → 覆蓋原檔案
 
 **Service Account 權限設定**：
 - **概念**：機器人帳號讓 Cloud Run 存取 Google Drive/Sheets
 - **設定流程**：Google Cloud Console → 建立 Service Account → 下載 JSON 金鑰 → 設定 Drive 權限
 - **安全性**：JSON 金鑰透過 Google Secret Manager 存放
+- **權限解決方案**：採用「GAS 複製 + Cloud Run 編輯」避免 Service Account 儲存配額限制
 
 **需要開啟的 GCP APIs**：
 - **Cloud Run API**：執行 Python 服務
@@ -528,22 +529,60 @@ K. 處理完成時間 (空白，Phase 5 填入)
   - 測試真正的使用情境，發現實際問題
   - 免費額度充足（200萬次/月 vs 預估數百次測試）
   - 風險可控，失敗只影響文件處理，不影響主要功能
-- **識別欄位**：使用 `userId`（LINE 用戶 ID）作為主要識別
+- **識別欄位**：使用 `timestamp`（申請時間戳記）作為主要識別，解決同用戶多筆申請的問題
 - **狀態管理**：透過 Google Sheets 的「狀態」欄位追蹤處理進度
 - **呼叫方式**：`UrlFetchApp.fetch()` 發送 HTTP POST 請求到 Cloud Run
 - **錯誤處理**：Cloud Run 呼叫失敗時降級到手動處理模式
 
 **Google Drive 資料夾配置**：
-- **模板檔案 ID**：`1OyDVT24n5INLcymXWBpDFHlKBbV_QZQE` (申請表模板.docx)
+- **Word 模板檔案 ID**：`1OyDVT24n5INLcymXWBpDFHlKBbV_QZQE` (申請表模板.docx)
+- **PDF 模板檔案 ID**：`19rgpiPJPrf_ZWDTBa-wn3ipnS1QXdlVg` (申請表模板.pdf)
 - **模板資料夾 ID**：`1mceVVtspzw9ZnP1094FC30fj0H3fFPAq` (申請文件/模板)
 - **生成文件資料夾 ID**：`1gVbcQRru4gBlhIyawELVnYmaDwqLNtGd` (申請文件/生成文件)
-- **模板檔名**：`申請表模板.docx`
 
 **檔案命名規則**：
+- **Word 複製檔名**：`申請表_YYYY年MM月_MMDD_HHMM_待處理.docx`（如：申請表_2024年10月_1005_1430_待處理.docx）
 - **PDF 檔名**：`申請表_YYYY年MM月_MMDD_HHMM.pdf`（如：申請表_2024年10月_1005_1430.pdf）
 - **時間戳記**：避免測試期間產生重複檔名
 - **參考 GAS**：採用與影片檔案相同的時間戳記格式
 - **存放位置**：生成文件資料夾
+- **檔案保留**：保留可編輯的 Word 檔案，方便人工檢查和修改
+
+**GAS 複製 + Cloud Run 編輯方案（最終版）**：
+1. **GAS 階段**：
+   - 申請確認後，複製 Word 模板和 PDF 模板到生成文件資料夾
+   - **方案 B 命名策略**：複製時就改名為最終檔案名稱
+   - Word 檔名：`申請表_YYYY年MM月_MMDD_HHMM_待處理.docx`
+   - PDF 檔名：`申請表_YYYY年MM月_MMDD_HHMM.pdf`
+   - 傳送複製檔案的 ID 和 PDF 檔案 ID 給 Cloud Run
+2. **Cloud Run 階段**：
+   - 接收複製檔案 ID，直接編輯已存在的 Word 檔案
+   - 執行文字替換（URL、日期）
+   - 轉換為 PDF
+   - **覆蓋已存在的 PDF 檔案**（保持檔案名稱不變）
+   - 更新 Google Sheets 狀態
+3. **技術優勢**：
+   - **完全避免 Service Account 儲存配額限制**（Word 和 PDF 都不建立新檔案）
+   - **檔案名稱一致性**：GAS 階段確定名稱，Cloud Run 無需處理命名邏輯
+   - **保留中間檔案**：Word 檔案供人工檢查，PDF 檔案供正式使用
+   - **權限需求簡單**：只需編輯者權限
+   - **每個申請獨立檔案**：便於追蹤和管理
+
+#### 5.4.1 重要問題解決記錄
+
+**時間戳記識別方案**（2025年9月11日解決）：
+- **問題**：同一 LINE 用戶多次申請時，使用 `userId` 無法區分不同申請記錄
+- **現象**：Cloud Run 找不到正確的待處理記錄，導致狀態更新失敗
+- **解決方案**：改用 `timestamp`（申請時間戳記）作為唯一識別
+- **技術實作**：
+  - GAS 傳送申請時間戳記給 Cloud Run
+  - Cloud Run 用時間戳記精確搜尋 Google Sheets 記錄
+  - 保留 userId 傳送以維持向後相容性
+- **優勢**：時間戳記天然唯一，避免記錄混淆，邏輯更簡潔
+
+**Sheets 寫入範圍修正**：
+- **問題**：寫入範圍 `I2:K2` 但嘗試寫入到 L 欄位
+- **解決**：調整寫入範圍為 `G2:K2`，正確對應狀態、錯誤訊息、PDF路徑、完成時間欄位
 
 #### 5.5 階段完成定義
 
