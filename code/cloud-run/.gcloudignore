@@ -1,0 +1,27 @@
+# 街頭藝人申請系統 - Cloud Run 部署忽略檔案
+# Phase 5: 文件處理系統
+
+# 敏感檔案
+.env*
+*.key
+*.log
+
+# Python 快取
+__pycache__/
+*.pyc
+*.pyo
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# 開發工具
+.vscode/
+.idea/
+.git/
+.gitignore
+
+# 測試和臨時檔案
+test*/
+*.tmp
+*.temp

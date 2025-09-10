@@ -1,0 +1,34 @@
+# 街頭藝人申請系統 - Cloud Run 依賴套件
+# Phase 5: 文件處理系統
+
+# Web 框架
+Flask==2.3.3
+gunicorn==21.2.0
+
+# Google Cloud APIs
+google-cloud-secret-manager==2.16.4
+google-api-python-client==2.100.0
+google-auth==2.23.3
+google-auth-oauthlib==1.1.0
+google-auth-httplib2==0.1.1
+
+# Word 文件處理
+python-docx==0.8.11
+
+# HTTP 請求處理
+requests==2.31.0
+
+# 日期時間處理
+python-dateutil==2.8.2
+
+# JSON 處理（Python 內建，但列出以明確依賴）
+# json - 內建模組
+
+# 檔案處理
+Pillow==10.0.1
+
+# 日誌處理（Python 內建）
+# logging - 內建模組
+
+# 系統工具（Python 內建）
+# os, tempfile, subprocess - 內建模組

@@ -14,6 +14,9 @@ google-credentials.json
 # GAS 設定檔案（包含敏感資訊）
 code/gas/Config.js
 
+# Cloud Run 設定檔案（包含敏感資訊）
+code/cloud-run/config.py
+
 # 個資相關檔案
 申請表模板.docx
 申請表模板.doc

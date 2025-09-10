@@ -462,6 +462,7 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **Cloud Run 環境建置**：Python 服務基礎架構
 - **文件處理系統**：Word 模板填寫和 PDF 轉換
 - **與 GAS 通信**：API 介接和狀態回報
+- **完整自動化流程**：LINE 申請 → Sheets 記錄 → 自動觸發 Cloud Run → 文件處理完成
 
 #### 5.1 Google Cloud Run 環境建置
 - [ ] 建立最小化 Python 專案結構
@@ -520,13 +521,28 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **Cloud Run → GAS**：HTTP 回應，回報處理結果和狀態
 - **錯誤處理**：失敗時回報詳細錯誤訊息給 GAS
 
+**GAS 啟動機制（自動觸發決策）**：
+- **觸發時機**：在 `executeFinalApplication()` 函數中，申請確認後立即自動呼叫
+- **設計決策**：採用自動觸發而非手動觸發，原因：
+  - 一次到位，避免重複開發手動觸發界面
+  - 測試真正的使用情境，發現實際問題
+  - 免費額度充足（200萬次/月 vs 預估數百次測試）
+  - 風險可控，失敗只影響文件處理，不影響主要功能
+- **識別欄位**：使用 `userId`（LINE 用戶 ID）作為主要識別
+- **狀態管理**：透過 Google Sheets 的「狀態」欄位追蹤處理進度
+- **呼叫方式**：`UrlFetchApp.fetch()` 發送 HTTP POST 請求到 Cloud Run
+- **錯誤處理**：Cloud Run 呼叫失敗時降級到手動處理模式
+
 **Google Drive 資料夾配置**：
-- **模板資料夾**：`1gVbcQRru4gBlhIyawELVnYmaDwqLNtGd` (申請文件/模板)
-- **生成文件資料夾**：`1gVbcQRru4gBlhIyawELVnYmaDwqLNtGd` (申請文件/生成文件)
+- **模板檔案 ID**：`1OyDVT24n5INLcymXWBpDFHlKBbV_QZQE` (申請表模板.docx)
+- **模板資料夾 ID**：`1mceVVtspzw9ZnP1094FC30fj0H3fFPAq` (申請文件/模板)
+- **生成文件資料夾 ID**：`1gVbcQRru4gBlhIyawELVnYmaDwqLNtGd` (申請文件/生成文件)
 - **模板檔名**：`申請表模板.docx`
 
 **檔案命名規則**：
-- **PDF 檔名**：`申請表_YYYY年MM月.pdf`（如：申請表_2024年10月.pdf）
+- **PDF 檔名**：`申請表_YYYY年MM月_MMDD_HHMM.pdf`（如：申請表_2024年10月_1005_1430.pdf）
+- **時間戳記**：避免測試期間產生重複檔名
+- **參考 GAS**：採用與影片檔案相同的時間戳記格式
 - **存放位置**：生成文件資料夾
 
 #### 5.5 階段完成定義

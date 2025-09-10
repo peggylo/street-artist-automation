@@ -476,14 +476,34 @@ function executeFinalApplication(userId) {
   
   try {
     // Phase 4: 記錄申請資訊到 Google Sheets
+    let applicationData;
     if (CONFIG.PHASE4.ENABLE_SHEETS_RECORDING) {
       console.log('📊 Phase 4: 記錄申請資訊到 Sheets');
       
-      const applicationData = prepareApplicationData(state);
+      applicationData = prepareApplicationData(state);
       const recordSuccess = recordApplicationToSheets(userId, applicationData);
       
       if (!recordSuccess) {
         console.error('⚠️ Sheets 記錄失敗，但繼續流程');
+      }
+    }
+    
+    // Phase 5: 自動呼叫 Cloud Run 處理文件
+    let documentProcessingMessage = '';
+    if (CONFIG.PHASE5.ENABLE_DOCUMENT_PROCESSING) {
+      console.log('🚀 Phase 5: 自動呼叫 Cloud Run 處理文件');
+      
+      if (!applicationData) {
+        applicationData = prepareApplicationData(state);
+      }
+      
+      const cloudRunResult = callCloudRunForDocumentProcessing(userId, applicationData);
+      
+      if (cloudRunResult.success) {
+        documentProcessingMessage = '\n🔄 文件處理已啟動，系統正在生成 PDF';
+      } else {
+        documentProcessingMessage = '\n⚠️ 文件處理啟動失敗，請稍後手動處理';
+        console.error('❌ Cloud Run 呼叫失敗:', cloudRunResult.error);
       }
     }
     
@@ -496,12 +516,10 @@ function executeFinalApplication(userId) {
 📍 申請日期：${dateDisplay}
 🎬 表演影片：${videoDisplay}
 
-📊 申請資訊已記錄到系統
-📧 系統將自動處理您的申請
-🔔 完成後會通知您
+📊 申請資訊已記錄到系統${documentProcessingMessage}
+🔔 處理完成後會更新狀態
 
-⚠️ Phase 4 測試中
-實際申請功能將在 Phase 5 實現`;
+🎉 Phase 5 自動化流程已啟動！`;
     
   } catch (error) {
     console.error('❌ 申請記錄過程發生錯誤:', error);
@@ -1429,6 +1447,123 @@ function testSheetsRecording() {
   } catch (error) {
     console.error('❌ Sheets 記錄功能測試失敗:', error);
     console.error('📋 錯誤詳情:', error.stack);
+    return false;
+  }
+}
+
+// =====================================================
+// Phase 5: Cloud Run 文件處理函數
+// =====================================================
+
+/**
+ * 呼叫 Cloud Run 進行文件處理
+ * @param {string} userId - 用戶ID
+ * @param {Object} applicationData - 申請資料
+ * @return {Object} 處理結果 {success: boolean, message: string, error?: string}
+ */
+function callCloudRunForDocumentProcessing(userId, applicationData) {
+  try {
+    console.log('🚀 Phase 5: 呼叫 Cloud Run 處理文件');
+    
+    const config = CONFIG.PHASE5.CLOUD_RUN;
+    const url = config.SERVICE_URL + config.PROCESS_ENDPOINT;
+    
+    // 準備請求資料
+    const requestData = {
+      userId: userId,
+      applicationData: applicationData,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('📤 發送請求到 Cloud Run:', url);
+    console.log('📋 請求資料:', JSON.stringify(requestData, null, 2));
+    
+    // 發送 HTTP 請求
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      payload: JSON.stringify(requestData),
+      muteHttpExceptions: true  // 獲取完整錯誤訊息
+    };
+    
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    console.log('📥 Cloud Run 回應狀態:', responseCode);
+    console.log('📄 Cloud Run 回應內容:', responseText);
+    
+    if (responseCode === 200) {
+      try {
+        const result = JSON.parse(responseText);
+        console.log('✅ Cloud Run 呼叫成功');
+        return {
+          success: true,
+          message: '文件處理已啟動',
+          result: result
+        };
+      } catch (parseError) {
+        console.error('❌ 解析 Cloud Run 回應失敗:', parseError);
+        return {
+          success: false,
+          message: '文件處理服務回應格式錯誤',
+          error: parseError.message
+        };
+      }
+    } else {
+      console.error('❌ Cloud Run 呼叫失敗:', responseCode, responseText);
+      return {
+        success: false,
+        message: `文件處理服務暫時無法使用 (${responseCode})`,
+        error: responseText
+      };
+    }
+    
+  } catch (error) {
+    console.error('❌ 呼叫 Cloud Run 時發生錯誤:', error);
+    return {
+      success: false,
+      message: '文件處理服務連線失敗',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 測試 Cloud Run 連線
+ */
+function testCloudRunConnection() {
+  try {
+    console.log('🧪 開始 Cloud Run 連線測試...');
+    
+    const config = CONFIG.PHASE5.CLOUD_RUN;
+    const healthUrl = config.SERVICE_URL + '/health';
+    
+    console.log('🔗 測試健康檢查端點:', healthUrl);
+    
+    const options = {
+      method: 'GET',
+      muteHttpExceptions: true
+    };
+    
+    const response = UrlFetchApp.fetch(healthUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    console.log('📥 健康檢查回應:', responseCode, responseText);
+    
+    if (responseCode === 200) {
+      console.log('✅ Cloud Run 服務正常');
+      return true;
+    } else {
+      console.error('❌ Cloud Run 服務異常');
+      return false;
+    }
+    
+  } catch (error) {
+    console.error('❌ Cloud Run 連線測試失敗:', error);
     return false;
   }
 }
