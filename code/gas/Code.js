@@ -1330,8 +1330,17 @@ function recordApplicationToSheets(userId, applicationData) {
     
     // 準備資料列
     const now = new Date();
+    // 統一時間戳記格式 (YYYY/M/D H:m:s) - 不補零，符合 Sheets 自然顯示
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1);
+    const day = String(now.getDate());
+    const hours = String(now.getHours());
+    const minutes = String(now.getMinutes());
+    const seconds = String(now.getSeconds());
+    const timestamp = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+    
     const rowData = [
-      now.toLocaleString('zh-TW'),  // A. 時間戳記
+      timestamp,  // A. 時間戳記 (統一格式)
       userId,                       // B. 用戶ID
       `${applicationData.year}/${applicationData.month}`,  // C. 申請月份
       formatDatesForSheet(applicationData.selectedDates),  // D. 選擇日期
@@ -1481,22 +1490,18 @@ function testSheetsRecording() {
 /**
  * 呼叫 Cloud Run 進行文件處理
  * @param {string} userId - 用戶ID
- * @param {Object} applicationData - 申請資料
+ * @param {Object} cloudRunData - 完整的 Cloud Run 請求資料
  * @return {Object} 處理結果 {success: boolean, message: string, error?: string}
  */
-function callCloudRunForDocumentProcessing(userId, applicationData) {
+function callCloudRunForDocumentProcessing(userId, cloudRunData) {
   try {
     console.log('🚀 Phase 5: 呼叫 Cloud Run 處理文件');
     
     const config = CONFIG.PHASE5.CLOUD_RUN;
     const url = config.SERVICE_URL + config.PROCESS_ENDPOINT;
     
-    // 準備請求資料
-    const requestData = {
-      userId: userId,
-      applicationData: applicationData,
-      timestamp: new Date().toISOString()
-    };
+    // 直接使用已準備好的 cloudRunData（格式已經正確）
+    const requestData = cloudRunData;
     
     console.log('📤 發送請求到 Cloud Run:', url);
     console.log('📋 請求資料:', JSON.stringify(requestData, null, 2));

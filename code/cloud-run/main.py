@@ -370,22 +370,23 @@ class DocumentProcessor:
                 else:
                     raise Exception(f"找不到用戶 {user_id} 的待處理記錄")
             
-            # 更新狀態
-            now = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+            # 更新狀態 - 使用不補零的時間格式，符合 Sheets 自然顯示
+            now_dt = datetime.now()
+            now = f"{now_dt.year}/{now_dt.month}/{now_dt.day} {now_dt.hour}:{now_dt.minute}:{now_dt.second}"
             update_data = []
             
             if status == "完成":
-                # 成功完成：更新狀態、錯誤訊息、PDF路徑、處理完成時間
+                # 成功完成：更新狀態、錯誤訊息、PDF路徑、處理開始時間、處理完成時間
                 update_data = [
-                    [status, "", pdf_url, now]  # G, H, I, K 欄位
+                    [status, "", pdf_url, now, now]  # G, H, I, J, K 欄位
                 ]
                 update_range = f"{sheet_name}!G{target_row}:K{target_row}"
             else:
-                # 處理失敗：更新狀態、錯誤訊息
+                # 處理失敗：更新狀態、錯誤訊息、處理開始時間、處理完成時間
                 update_data = [
-                    [status, error_message]  # G, H 欄位
+                    [status, error_message, "", now, now]  # G, H, I, J, K 欄位
                 ]
-                update_range = f"{sheet_name}!G{target_row}:H{target_row}"
+                update_range = f"{sheet_name}!G{target_row}:K{target_row}"
             
             # 執行更新
             self.sheets_service.spreadsheets().values().update(
