@@ -31,6 +31,7 @@ code/cloud-run/
 ├── config.py               # 設定檔和常數 [Phase 5]
 ├── requirements.txt        # Python 套件清單 [Phase 5]
 ├── Dockerfile             # 容器化設定 [Phase 5]
+├── .gcloudignore          # Cloud Run 部署忽略檔案 [Phase 5]
 └── (根據實際複雜度決定是否拆分更多檔案)
 ```
 
@@ -671,7 +672,7 @@ K. 處理完成時間 (空白，Phase 5 填入)
 
 #### 🎯 Phase 5 實際產出 ✅ **已完成**
 **程式碼檔案**：
-- 4個新增 Cloud Run 檔案（main.py, config.py, requirements.txt, Dockerfile）✅
+- 5個新增 Cloud Run 檔案（main.py, config.py, requirements.txt, Dockerfile, .gcloudignore）✅
 - 本地開發和測試環境設定 ✅
 
 **功能實現**：
@@ -694,9 +695,10 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - 為 Phase 6 網站自動化做準備 ✅
 
 **重要成就**：
-- 解決了多個技術難題：時間戳記格式統一、資料格式匹配、PDF 內容填寫
+- 解決了多個技術難題：時間戳記格式統一、資料格式匹配、PDF 內容填寫、時區問題
 - 實現了完整的自動化流程：LINE 申請 → GAS 處理 → Cloud Run 文件生成 → Sheets 狀態更新
 - 建立了穩定的服務架構，為 Phase 6 奠定了堅實基礎
+- 處理時間相同問題：證明系統處理速度極快（<1秒），時間精度只到秒是正常現象
 
 ### Phase 6: 網站自動化與整合測試 (2-3週)
 
