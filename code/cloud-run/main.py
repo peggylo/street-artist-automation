@@ -16,6 +16,7 @@ import logging
 import tempfile
 import subprocess
 from datetime import datetime
+import pytz
 from flask import Flask, request, jsonify
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -370,8 +371,9 @@ class DocumentProcessor:
                 else:
                     raise Exception(f"找不到用戶 {user_id} 的待處理記錄")
             
-            # 更新狀態 - 使用 YYYYMMDD-HHmmss 統一時間格式
-            now_dt = datetime.now()
+            # 更新狀態 - 使用台灣時區的 YYYYMMDD-HHmmss 統一時間格式
+            taiwan_tz = pytz.timezone('Asia/Taipei')
+            now_dt = datetime.now(taiwan_tz)
             now = f"{now_dt.year:04d}{now_dt.month:02d}{now_dt.day:02d}-{now_dt.hour:02d}{now_dt.minute:02d}{now_dt.second:02d}"
             update_data = []
             

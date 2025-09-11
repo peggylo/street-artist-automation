@@ -627,6 +627,21 @@ K. 處理完成時間 (空白，Phase 5 填入)
   - GAS `prepareApplicationData()`：時間戳記生成
   - Cloud Run `update_sheets_status()`：搜尋和回填時間戳記
 - **部署**：Cloud Run 記憶體提升至 1GB，避免記憶體超限
+
+**Cloud Run 時區問題**（2025年9月12日解決）：
+- **問題**：處理開始時間、處理完成時間比時間戳記早8小時
+- **根本原因**：
+  - GAS 時間戳記使用台灣時區（UTC+8）：`20250912-024441`
+  - Cloud Run 處理時間使用 UTC 時區：`20250911-184511`
+  - 時差正好8小時
+- **解決方案**：
+  1. 在 `main.py` 加入 `pytz` 台灣時區處理
+  2. 修改 `update_sheets_status()` 使用 `datetime.now(taiwan_tz)`
+  3. 設定 Cloud Run 環境變數 `TZ=Asia/Taipei`
+  4. 在 `requirements.txt` 加入 `pytz==2023.3` 依賴
+- **技術實作**：`taiwan_tz = pytz.timezone('Asia/Taipei')`
+- **影響欄位**：處理開始時間（J欄）、處理完成時間（K欄）
+- **部署版本**：`document-processor-00012-jpk`
 - **影響欄位**：年/月/日 時:分:秒 所有時間欄位
 - **優勢**：完全消除補零差異，確保 GAS 生成與 Sheets 顯示一致
 
