@@ -1328,24 +1328,14 @@ function recordApplicationToSheets(userId, applicationData) {
       return false;
     }
     
-    // 準備資料列
-    const now = new Date();
-    // 統一時間戳記格式 (YYYY/M/D H:m:s) - 不補零，符合 Sheets 自然顯示
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1);
-    const day = String(now.getDate());
-    const hours = String(now.getHours());
-    const minutes = String(now.getMinutes());
-    const seconds = String(now.getSeconds());
-    const timestamp = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
-    
+    // 準備資料列（時間戳記已在 applicationData 中生成）
     const rowData = [
-      timestamp,  // A. 時間戳記 (統一格式)
+      applicationData.timestamp,    // A. 時間戳記 (使用 applicationData 中的統一時間戳記)
       userId,                       // B. 用戶ID
       `${applicationData.year}/${applicationData.month}`,  // C. 申請月份
-      formatDatesForSheet(applicationData.selectedDates),  // D. 選擇日期
+      formatDatesForSheet(applicationData.selected_dates),  // D. 選擇日期 (修正欄位名稱)
       applicationData.videoSource,  // E. 影片來源
-      applicationData.videoUrl,     // F. 影片連結
+      applicationData.video_url,    // F. 影片連結 (修正欄位名稱)
       '待處理',                     // G. 狀態
       '',                          // H. 錯誤訊息
       '',                          // I. PDF路徑
@@ -1417,22 +1407,33 @@ function formatDatesForSheet(selectedDates) {
  */
 function prepareApplicationData(state) {
   // 決定影片來源和連結
-  let videoSource, videoUrl;
+  let videoSource, video_url;
   
   if (state.useDefaultVideo) {
     videoSource = '常用影片';
-    videoUrl = CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_URL;
+    video_url = CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_URL;
   } else {
     videoSource = '新上傳';
-    videoUrl = state.newVideoUrl || '';
+    video_url = state.newVideoUrl || '';
   }
   
+  // 生成統一時間戳記格式 (YYYY/M/D H:m:s) - 不補零
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1);
+  const day = String(now.getDate());
+  const hours = String(now.getHours());
+  const minutes = String(now.getMinutes());
+  const seconds = String(now.getSeconds());
+  const timestamp = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+  
   return {
+    timestamp: timestamp,                    // 新增：與 Sheets 記錄一致的時間戳記
     year: state.targetMonth.year,
     month: state.targetMonth.month,
-    selectedDates: state.selectedDates,
-    videoSource: videoSource,
-    videoUrl: videoUrl
+    selected_dates: state.selectedDates,     // 修正：改為 selected_dates（符合 Cloud Run 期待）
+    videoSource: videoSource,                // 保留：用於 Sheets 記錄
+    video_url: video_url                     // 修正：改為 video_url（符合 Cloud Run 期待）
   };
 }
 

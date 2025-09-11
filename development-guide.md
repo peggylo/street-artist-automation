@@ -605,6 +605,18 @@ K. 處理完成時間 (空白，Phase 5 填入)
   1. 修改 `callCloudRunForDocumentProcessing()` 直接使用預先準備的 `cloudRunData`
   2. 確保資料格式與測試函數一致：`user_id`, `application_data`, `timestamp`（Sheets 格式）
 - **技術細節**：`executeFinalApplication()` 中已正確準備 `cloudRunData` 格式，函數只需直接使用
+
+**PDF 內容空白問題**（2025年9月12日解決）：
+- **問題**：PDF 生成成功但內容（URL、日期）變成空白，手動測試正常但實際 LINE 申請失敗
+- **根本原因**：`prepareApplicationData()` 產生的資料結構與 Cloud Run 期待不匹配
+  - 欄位名稱：`selectedDates` vs `selected_dates`、`videoUrl` vs `video_url`
+  - 缺少 `timestamp` 欄位
+- **Cloud Run 日誌證實**：`替換資料: {'<url>': '', '<date1>': '', '<date2>': '', '<date3>': ''}`
+- **解決方案**：
+  1. 修正 `prepareApplicationData()` 欄位名稱：`selected_dates`, `video_url`
+  2. 加入統一時間戳記生成：`timestamp`
+  3. 修正 `recordApplicationToSheets()` 對應欄位名稱
+  4. 移除重複的時間戳記生成邏輯
 - **影響欄位**：年/月/日 時:分:秒 所有時間欄位
 - **優勢**：完全消除補零差異，確保 GAS 生成與 Sheets 顯示一致
 
