@@ -455,33 +455,33 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - 資料格式和完整性驗證 ✅
 - 真實 LINE Bot 使用驗證 ✅
 
-### Phase 5: 文件處理系統 (1-2週)
+### Phase 5: 文件處理系統 (1-2週) ✅ **已完成**
 
 #### 📋 Phase 5 範疇定義
 **Phase 5 專注於**：
-- **Cloud Run 環境建置**：Python 服務基礎架構
-- **文件處理系統**：Word 模板填寫和 PDF 轉換
-- **與 GAS 通信**：API 介接和狀態回報
-- **完整自動化流程**：LINE 申請 → Sheets 記錄 → 自動觸發 Cloud Run → 文件處理完成
+- **Cloud Run 環境建置**：Python 服務基礎架構 ✅
+- **文件處理系統**：Word 模板填寫和 PDF 轉換 ✅
+- **與 GAS 通信**：API 介接和狀態回報 ✅
+- **完整自動化流程**：LINE 申請 → Sheets 記錄 → 自動觸發 Cloud Run → 文件處理完成 ✅
 
-#### 5.1 Google Cloud Run 環境建置
-- [ ] 建立最小化 Python 專案結構
-- [ ] 設定 Dockerfile 和部署設定
-- [ ] 實現基本 HTTP 服務和健康檢查
-- [ ] 設定與 GAS 的 API 通信協議
+#### 5.1 Google Cloud Run 環境建置 ✅ **已完成**
+- [x] 建立最小化 Python 專案結構
+- [x] 設定 Dockerfile 和部署設定
+- [x] 實現基本 HTTP 服務和健康檢查
+- [x] 設定與 GAS 的 API 通信協議
 
-#### 5.2 文件處理核心功能
-- [ ] 實現 Word 模板下載（從 Google Drive）
-- [ ] 建立 Word 文件自動填寫功能
-- [ ] 實現 PDF 轉換（LibreOffice headless）
-- [ ] 建立檔案上傳回 Google Drive 功能
-- [ ] 實現檔案命名規則（申請表_YYYY年MM月.pdf）
+#### 5.2 文件處理核心功能 ✅ **已完成**
+- [x] 實現 Word 模板下載（從 Google Drive）
+- [x] 建立 Word 文件自動填寫功能
+- [x] 實現 PDF 轉換（LibreOffice headless）
+- [x] 建立檔案上傳回 Google Drive 功能
+- [x] 實現檔案命名規則（申請表_YYYY年MM月.pdf）
 
-#### 5.3 資料整合和狀態管理
-- [ ] 整合申請資訊（日期、影片連結、個人資料）
-- [ ] 實現 Google Sheets 狀態更新（處理中→完成/失敗）
-- [ ] 建立錯誤處理和重試機制
-- [ ] 實現處理結果回報給 GAS
+#### 5.3 資料整合和狀態管理 ✅ **已完成**
+- [x] 整合申請資訊（日期、影片連結、個人資料）
+- [x] 實現 Google Sheets 狀態更新（處理中→完成/失敗）
+- [x] 建立錯誤處理和重試機制
+- [x] 實現處理結果回報給 GAS
 
 #### 🎯 Phase 5 開發決策（2025年9月）
 
@@ -541,9 +541,9 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **生成文件資料夾 ID**：`1gVbcQRru4gBlhIyawELVnYmaDwqLNtGd` (申請文件/生成文件)
 
 **檔案命名規則**：
-- **Word 複製檔名**：`申請表_YYYY年MM月_MMDD_HHMM_待處理.docx`（如：申請表_2024年10月_1005_1430_待處理.docx）
-- **PDF 檔名**：`申請表_YYYY年MM月_MMDD_HHMM.pdf`（如：申請表_2024年10月_1005_1430.pdf）
-- **時間戳記**：避免測試期間產生重複檔名
+- **Word 複製檔名**：`申請表_YYYY年MM月_YYYYMMDD-HHmmss_待處理.docx`（如：申請表_2025年10月_20250912-022107_待處理.docx）
+- **PDF 檔名**：`申請表_YYYY年MM月_YYYYMMDD-HHmmss.pdf`（如：申請表_2025年10月_20250912-022107.pdf）
+- **時間戳記**：使用 `YYYYMMDD-HHmmss` 格式，避免測試期間產生重複檔名
 - **參考 GAS**：採用與影片檔案相同的時間戳記格式
 - **存放位置**：生成文件資料夾
 - **檔案保留**：保留可編輯的 Word 檔案，方便人工檢查和修改
@@ -552,8 +552,8 @@ K. 處理完成時間 (空白，Phase 5 填入)
 1. **GAS 階段**：
    - 申請確認後，複製 Word 模板和 PDF 模板到生成文件資料夾
    - **方案 B 命名策略**：複製時就改名為最終檔案名稱
-   - Word 檔名：`申請表_YYYY年MM月_MMDD_HHMM_待處理.docx`
-   - PDF 檔名：`申請表_YYYY年MM月_MMDD_HHMM.pdf`
+   - Word 檔名：`申請表_YYYY年MM月_YYYYMMDD-HHmmss_待處理.docx`
+   - PDF 檔名：`申請表_YYYY年MM月_YYYYMMDD-HHmmss.pdf`
    - 傳送複製檔案的 ID 和 PDF 檔案 ID 給 Cloud Run
 2. **Cloud Run 階段**：
    - 接收複製檔案 ID，直接編輯已存在的 Word 檔案
@@ -617,6 +617,16 @@ K. 處理完成時間 (空白，Phase 5 填入)
   2. 加入統一時間戳記生成：`timestamp`
   3. 修正 `recordApplicationToSheets()` 對應欄位名稱
   4. 移除重複的時間戳記生成邏輯
+
+**時間戳記格式最終統一**（2025年9月12日解決）：
+- **問題**：`YYYY/M/D H:m:s` 格式仍有補零不一致問題（`2:21:7` vs `2:21:07`）
+- **最終解決方案**：統一改為 `YYYYMMDD-HHmmss` 格式
+  - **優勢**：固定位數、無特殊字元、排序友好、檔名友好
+  - **範例**：`20250912-022107`
+- **修改範圍**：
+  - GAS `prepareApplicationData()`：時間戳記生成
+  - Cloud Run `update_sheets_status()`：搜尋和回填時間戳記
+- **部署**：Cloud Run 記憶體提升至 1GB，避免記憶體超限
 - **影響欄位**：年/月/日 時:分:秒 所有時間欄位
 - **優勢**：完全消除補零差異，確保 GAS 生成與 Sheets 顯示一致
 
@@ -637,36 +647,41 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **Phase 5 完成** = 文件處理完成，可供人工下載使用
 - **Phase 6 完成** = 整個申請流程完成，真正提交到松菸網站
 
-#### 5.6 階段測試里程碑
-- [ ] ✅ Cloud Run 服務能正常部署和運行
-- [ ] ✅ Service Account 權限設定成功，能存取 Google Drive
-- [ ] ✅ Word 模板能正確填寫（url, date1-3）和轉換 PDF
-- [ ] ✅ 與 GAS 通信正常，狀態更新成功
-- [ ] ✅ 完整文件處理流程測試通過
+#### 5.6 階段測試里程碑 ✅ **已完成**
+- [x] ✅ Cloud Run 服務能正常部署和運行
+- [x] ✅ Service Account 權限設定成功，能存取 Google Drive
+- [x] ✅ Word 模板能正確填寫（url, date1-3）和轉換 PDF
+- [x] ✅ 與 GAS 通信正常，狀態更新成功
+- [x] ✅ 完整文件處理流程測試通過
 
-#### 🎯 Phase 5 預期產出
+#### 🎯 Phase 5 實際產出 ✅ **已完成**
 **程式碼檔案**：
-- 4個新增 Cloud Run 檔案（main.py, config.py, requirements.txt, Dockerfile）
-- 本地開發和測試環境設定
+- 4個新增 Cloud Run 檔案（main.py, config.py, requirements.txt, Dockerfile）✅
+- 本地開發和測試環境設定 ✅
 
 **功能實現**：
-- 完整的 Word → PDF 文件處理流程
-- Google Drive 檔案下載和上傳功能
-- 與 GAS 的 HTTP API 通信
-- Google Sheets 狀態更新機制
-- Service Account 權限管理
+- 完整的 Word → PDF 文件處理流程 ✅
+- Google Drive 檔案下載和上傳功能 ✅
+- 與 GAS 的 HTTP API 通信 ✅
+- Google Sheets 狀態更新機制 ✅
+- Service Account 權限管理 ✅
 
 **基礎設施**：
-- Google Cloud Run 服務部署
-- Service Account 和權限設定
-- 環境變數和機密管理
-- 基本監控和日誌記錄
+- Google Cloud Run 服務部署 ✅
+- Service Account 和權限設定 ✅
+- 環境變數和機密管理 ✅
+- 基本監控和日誌記錄 ✅
 
 **測試驗證**：
-- 文件處理功能完整測試
-- API 通信穩定性驗證
-- 錯誤處理機制驗證
-- 為 Phase 6 網站自動化做準備
+- 文件處理功能完整測試 ✅
+- API 通信穩定性驗證 ✅
+- 錯誤處理機制驗證 ✅
+- 為 Phase 6 網站自動化做準備 ✅
+
+**重要成就**：
+- 解決了多個技術難題：時間戳記格式統一、資料格式匹配、PDF 內容填寫
+- 實現了完整的自動化流程：LINE 申請 → GAS 處理 → Cloud Run 文件生成 → Sheets 狀態更新
+- 建立了穩定的服務架構，為 Phase 6 奠定了堅實基礎
 
 ### Phase 6: 網站自動化與整合測試 (2-3週)
 
@@ -770,5 +785,5 @@ K. 處理完成時間 (空白，Phase 5 填入)
 
 ---
 
-**最後更新**: 2025年9月  
-**版本**: v4.0 - Phase 4 完成
+**最後更新**: 2025年9月12日  
+**版本**: v5.0 - Phase 5 完成

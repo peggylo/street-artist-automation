@@ -370,9 +370,9 @@ class DocumentProcessor:
                 else:
                     raise Exception(f"找不到用戶 {user_id} 的待處理記錄")
             
-            # 更新狀態 - 使用不補零的時間格式，符合 Sheets 自然顯示
+            # 更新狀態 - 使用 YYYYMMDD-HHmmss 統一時間格式
             now_dt = datetime.now()
-            now = f"{now_dt.year}/{now_dt.month}/{now_dt.day} {now_dt.hour}:{now_dt.minute}:{now_dt.second}"
+            now = f"{now_dt.year:04d}{now_dt.month:02d}{now_dt.day:02d}-{now_dt.hour:02d}{now_dt.minute:02d}{now_dt.second:02d}"
             update_data = []
             
             if status == "完成":

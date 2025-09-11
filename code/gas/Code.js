@@ -1417,15 +1417,15 @@ function prepareApplicationData(state) {
     video_url = state.newVideoUrl || '';
   }
   
-  // 生成統一時間戳記格式 (YYYY/M/D H:m:s) - 不補零
+  // 生成統一時間戳記格式 (YYYYMMDD-HHmmss) - 固定位數，避免補零問題
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1);
-  const day = String(now.getDate());
-  const hours = String(now.getHours());
-  const minutes = String(now.getMinutes());
-  const seconds = String(now.getSeconds());
-  const timestamp = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
   
   return {
     timestamp: timestamp,                    // 新增：與 Sheets 記錄一致的時間戳記
