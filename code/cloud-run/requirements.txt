@@ -1,9 +1,14 @@
 # 街頭藝人申請系統 - Cloud Run 依賴套件
 # Phase 5: 文件處理系統
 
+# Phase 6: 網站自動化
+
 # Web 框架
 Flask==2.3.3
 gunicorn==21.2.0
+
+# Phase 6: 網站自動化 (Playwright)
+playwright==1.40.0
 
 # Google Cloud APIs
 google-cloud-secret-manager==2.16.4

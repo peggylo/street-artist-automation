@@ -25,3 +25,10 @@ Thumbs.db
 test*/
 *.tmp
 *.temp
+
+# Phase 6: 開發環境和分析工具
+venv/
+env/
+.venv/
+analyze_website.py
+website_analysis_result.json
