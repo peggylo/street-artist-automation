@@ -722,6 +722,7 @@ K. 處理完成時間 (空白，Phase 5 填入)
 **個人資料設定**：
 - 申請者固定資料已加入 `config.py` 中的 `APPLICANT_INFO` 設定
 - 街頭藝人證照檔案已加入 `config.py` 中的 `CERTIFICATE` 設定
+- **個人資料安全化**：將 `APPLICANT_INFO` 移至 Google Secret Manager 存放，提升安全性
 
 **網站結構分析策略**：
 - **階段1**：網站結構分析（一次性）- 獨立檔案 `analyze_website.py`
@@ -744,6 +745,11 @@ K. 處理完成時間 (空白，Phase 5 填入)
   1. 填寫完成截圖（提交前）
   2. 成功截圖（提交後成功頁面）
   3. 失敗截圖（失敗點畫面）
+
+**網站表單選擇器整合**：
+- **階段1分析結果**：已將 `analyze_website.py` 的選擇器結果整合到 `config.py`
+- **FORM_SELECTORS 配置**：包含第一頁和表單頁的所有必要選擇器
+- **JSON檔案清理**：刪除 `website_analysis_result.json`，避免重複配置
 
 **狀態管理重新定義**：
 ```
