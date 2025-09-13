@@ -727,6 +727,16 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **階段1**：網站結構分析（一次性）- 獨立檔案 `analyze_website.py`
 - **階段2A-2C**：自動化執行（重複使用）- 主要邏輯 `website_automation.py`
 
+**兩頁式網站架構**：
+- **第一頁（固定網址）**：`https://www.songshanculturalpark.org/solicitation` - 徵件活動列表頁
+- **第二頁（動態網址）**：`https://www.songshanculturalpark.org/solicitation/submission/[動態ID]` - 申請表單頁
+
+**街頭藝人標題辨識策略**：
+- **關鍵字匹配**：只需包含「街頭藝人」四個字即可辨識
+- **網站特性**：每次只會保留一個最新月份的街頭藝人申請連結
+- **失敗處理**：如果第一頁找不到「街頭藝人」關鍵字，直接報錯當作失敗
+- **申請期限**：不需驗證，網站只會顯示可申請的連結
+
 **截圖功能設計**：
 - **存儲位置**：Google Drive 資料夾ID `1Ef0-1MQzuhUormRVICRF_6d_Gi-veCOM`
 - **命名格式**：`申請截圖_YYYY年MM月_YYYYMMDD-HHmmss_狀態.png`
