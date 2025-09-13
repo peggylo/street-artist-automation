@@ -812,6 +812,17 @@ gcloud run services update document-processor \
 - ✅ 截圖「填寫完成」並存入Google Drive
 - ✅ **停在提交前，不按送出按鈕**
 
+### **階段2A.5：Cloud Run 驗證**
+**執行方式**：將 2A 成功的程式碼部署到 Cloud Run 測試
+**測試範圍**：Cloud Run 環境下的網站自動化但不提交
+**目的**：驗證 Playwright 在 Cloud Run 環境中正常運作
+**成功標準**：
+- ✅ Cloud Run 能成功啟動 Playwright + Chromium
+- ✅ 網站自動化功能在雲端環境正常運作
+- ✅ 截圖功能在 Cloud Run 中正常存入 Google Drive
+- ✅ 確認無環境差異問題
+- ✅ **停在提交前，不按送出按鈕**
+
 ### **階段2B：完整系統整合**
 **執行方式**：LINE申請觸發完整流程
 **測試範圍**：端到端流程但不提交
