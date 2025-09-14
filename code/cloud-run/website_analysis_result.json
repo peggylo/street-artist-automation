@@ -1,18 +1,34 @@
 {
-  "first_page": {
-    "street_artist_text_selector": "xpath=//*[contains(text(), '街頭藝人')]",
-    "apply_button_selector": "xpath=//*[contains(text(), '我要申請')]",
-    "found_link": "/solicitation/submission/ddd666c5-d7cb-471d-80bc-4cf7513f51c7"
+  "selectors": {
+    "first_page": {
+      "street_artist_text": "xpath=//*[contains(text(), '街頭藝人')]",
+      "apply_button": "xpath=//*[contains(text(), '我要申請')]"
+    },
+    "form_page": {
+      "name_input": "input[placeholder*=\"姓名\"]",
+      "phone_input": "input[placeholder*=\"手機\"]",
+      "email_input": "input[placeholder*=\"信箱\"]",
+      "pdf_upload": "input[type=\"file\"][accept=\".pdf\"]",
+      "certificate_upload": "input[type=\"file\"]:not([accept=\".pdf\"])",
+      "recaptcha_frame": "iframe[src*=\"recaptcha\"]",
+      "recaptcha_checkbox": ".recaptcha-checkbox-border",
+      "agreement_checkbox": "input[type=\"checkbox\"]:nth-of-type(1)",
+      "submit_button": "button:has-text(\"確認\")"
+    }
   },
-  "form_page": {
-    "name_input": "input[placeholder*=\"姓名\"]",
-    "phone_input": "input[placeholder*=\"手機\"]",
-    "email_input": "input[placeholder*=\"信箱\"]",
-    "pdf_upload": "input[type=\"file\"]:nth-of-type(1)",
-    "certificate_upload": "input[type=\"file\"]:nth-of-type(2)",
-    "recaptcha_frame": "iframe[src*=\"recaptcha\"]",
-    "recaptcha_checkbox": ".recaptcha-checkbox-border",
-    "agreement_checkbox": "input[type=\"checkbox\"]:nth-of-type(1)",
-    "submit_button": "button:has-text(\"確認\")"
+  "matching_logic": {
+    "base_url": "https://www.songshanculturalpark.org/solicitation",
+    "street_artist_keyword": "街頭藝人",
+    "application_keywords": ["展演申請", "申請"],
+    "strategy": "選項C：包含「街頭藝人」和（「展演申請」或「申請」）"
+  },
+  "analysis_metadata": {
+    "analysis_date": "2024-09-14",
+    "analysis_time": "07:50:00",
+    "website_url": "https://www.songshanculturalpark.org/solicitation",
+    "analysis_success": true,
+    "playwright_version": "1.40.0",
+    "browser": "chromium",
+    "execution_mode": "有頭模式"
   }
 }

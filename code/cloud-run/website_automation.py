@@ -1,15 +1,19 @@
 """
 Phase 6 - 階段 2A: 基礎網站自動化
-松菸網站申請流程自動化（本地測試版本）
+表演場地網站申請流程自動化（本地測試版本）
 
 功能：
-- 導航到松菸網站並找到街頭藝人申請
+- 導航到表演場地網站並找到街頭藝人申請
 - 填寫個人資料（從 Secret Manager 讀取）
-- 上傳申請 PDF 和街頭藝人證
+- 上傳申請 PDF（從雲端下載）和街頭藝人證（本地檔案）
 - 處理 reCAPTCHA 驗證
 - 勾選同意條款
-- 截圖並存入 Google Drive
+- 截圖並存入本地資料夾
 - 停在提交前（不按送出按鈕）
+
+階段2A簡化策略：
+- 街頭藝人證使用本地檔案（避免雲端下載複雜度）
+- 截圖存入專案根目錄的申請截圖資料夾
 """
 
 import os
@@ -321,27 +325,151 @@ class WebsiteAutomation:
             pdf_file_name = self.config.TEST_APPLICATION_PDF['FILE_NAME']
             pdf_local_path = self._download_file_from_drive(pdf_file_id, pdf_file_name)
             
-            # 2. 下載街頭藝人證
-            cert_file_id = self.config.CERTIFICATE['FILE_ID']
+            # 2. 使用本地街頭藝人證（階段2A簡化版）
             cert_file_name = self.config.CERTIFICATE['FILE_NAME']
-            cert_local_path = self._download_file_from_drive(cert_file_id, cert_file_name)
+            cert_local_path = os.path.join("..", "..", "證照文件", cert_file_name)
+            print(f"📄 使用本地街頭藝人證：{cert_local_path}")
+            
+            # 檢查本地檔案是否存在
+            if not os.path.exists(cert_local_path):
+                raise Exception(f"本地街頭藝人證檔案不存在：{cert_local_path}")
             
             # 3. 上傳申請 PDF
             pdf_upload_selector = self.analysis_result['selectors']['form_page']['pdf_upload']
+            print(f"🔍 PDF上傳選擇器：{pdf_upload_selector}")
+            print(f"📄 PDF檔案路徑：{pdf_local_path}")
+            
             self.page.wait_for_selector(pdf_upload_selector, timeout=10000)
+            
+            # 上傳前檢查
+            pdf_element = self.page.locator(pdf_upload_selector)
+            print(f"📋 PDF上傳前檢查：可見={pdf_element.is_visible()}, 啟用={pdf_element.is_enabled()}")
+            
             self.page.set_input_files(pdf_upload_selector, pdf_local_path)
-            print(f"✅ 成功上傳申請 PDF：{pdf_file_name}")
+            print(f"✅ 已執行PDF上傳指令：{pdf_file_name}")
             
             # 等待檔案上傳處理
             time.sleep(2)
             
-            # 4. 上傳街頭藝人證
+            # 上傳後驗證
+            try:
+                uploaded_file_name = self.page.evaluate(f"""
+                    document.querySelector('{pdf_upload_selector}').files[0]?.name || '無檔案'
+                """)
+                print(f"📋 PDF上傳後驗證：檔案名稱 = {uploaded_file_name}")
+            except:
+                print("📋 PDF上傳後驗證：無法取得檔案資訊")
+            
+            # 4. 除錯：列出所有檔案上傳欄位
+            print("🔍 除錯：檢查頁面上所有檔案上傳欄位...")
+            all_file_inputs = self.page.locator('input[type="file"]').all()
+            print(f"📊 找到 {len(all_file_inputs)} 個檔案上傳欄位：")
+            
+            for i, file_input in enumerate(all_file_inputs):
+                try:
+                    # 取得元素屬性
+                    element_id = file_input.get_attribute('id') or "無ID"
+                    element_name = file_input.get_attribute('name') or "無name"
+                    element_class = file_input.get_attribute('class') or "無class"
+                    is_visible = file_input.is_visible()
+                    is_enabled = file_input.is_enabled()
+                    
+                    print(f"  檔案欄位 {i+1}:")
+                    print(f"    ID: {element_id}")
+                    print(f"    Name: {element_name}")
+                    print(f"    Class: {element_class}")
+                    print(f"    可見: {is_visible}")
+                    print(f"    啟用: {is_enabled}")
+                    print(f"    選擇器: input[type=\"file\"]:nth-of-type({i+1})")
+                    
+                except Exception as e:
+                    print(f"  檔案欄位 {i+1}: 無法取得資訊 - {str(e)}")
+            
+            # 5. 嘗試上傳街頭藝人證
             cert_upload_selector = self.analysis_result['selectors']['form_page']['certificate_upload']
-            self.page.set_input_files(cert_upload_selector, cert_local_path)
-            print(f"✅ 成功上傳街頭藝人證：{cert_file_name}")
+            print(f"🔍 使用選擇器尋找街頭藝人證上傳欄位：{cert_upload_selector}")
             
-            # 等待檔案上傳處理
-            time.sleep(2)
+            try:
+                # 先檢查選擇器是否能找到元素
+                cert_elements = self.page.locator(cert_upload_selector).all()
+                print(f"📊 選擇器找到 {len(cert_elements)} 個匹配元素")
+                
+                if len(cert_elements) == 0:
+                    raise Exception(f"選擇器 {cert_upload_selector} 找不到任何元素")
+                
+                # 等待元素出現
+                print("⏳ 等待街頭藝人證上傳欄位出現...")
+                self.page.wait_for_selector(cert_upload_selector, timeout=10000)
+                
+                cert_upload_element = self.page.locator(cert_upload_selector)
+                
+                # 檢查元素狀態
+                is_visible = cert_upload_element.is_visible()
+                is_enabled = cert_upload_element.is_enabled()
+                print(f"📋 街頭藝人證上傳欄位狀態：可見={is_visible}, 啟用={is_enabled}")
+                
+                if not is_visible:
+                    raise Exception("街頭藝人證上傳欄位不可見")
+                if not is_enabled:
+                    raise Exception("街頭藝人證上傳欄位未啟用")
+                
+                print(f"📎 開始上傳街頭藝人證：{cert_local_path}")
+                self.page.set_input_files(cert_upload_selector, cert_local_path)
+                print(f"✅ 成功上傳街頭藝人證：{cert_file_name}")
+                
+                # 等待檔案上傳處理
+                time.sleep(3)
+                
+            except Exception as cert_error:
+                print(f"❌ 街頭藝人證上傳失敗：{str(cert_error)}")
+                
+                # 嘗試備用方案：使用第2個檔案欄位（如果存在）
+                if len(all_file_inputs) >= 2:
+                    print("🔄 嘗試備用方案：直接使用第2個檔案欄位...")
+                    try:
+                        backup_selector = "input[type=\"file\"]:nth-child(2)"
+                        print(f"🔍 備用選擇器：{backup_selector}")
+                        
+                        backup_element = self.page.locator(backup_selector)
+                        if backup_element.count() > 0:
+                            print(f"🔍 備用方案上傳前檢查：可見={backup_element.is_visible()}, 啟用={backup_element.is_enabled()}")
+                            print(f"📄 街頭藝人證檔案路徑：{cert_local_path}")
+                            
+                            self.page.set_input_files(backup_selector, cert_local_path)
+                            print(f"✅ 已執行備用方案上傳指令：{cert_file_name}")
+                            
+                            # 上傳後驗證
+                            time.sleep(1)
+                            try:
+                                uploaded_file_name = self.page.evaluate(f"""
+                                    document.querySelector('{backup_selector}').files[0]?.name || '無檔案'
+                                """)
+                                print(f"📋 備用方案上傳後驗證：檔案名稱 = {uploaded_file_name}")
+                            except:
+                                print("📋 備用方案上傳後驗證：無法取得檔案資訊")
+                        else:
+                            raise Exception("備用選擇器也找不到元素")
+                            
+                    except Exception as backup_error:
+                        print(f"❌ 備用方案也失敗：{str(backup_error)}")
+                        raise cert_error  # 拋出原始錯誤
+                else:
+                    raise cert_error  # 拋出原始錯誤
+            
+            # 6. 最終驗證：檢查兩個檔案欄位的最終狀態
+            print("🔍 最終驗證：檢查所有檔案上傳欄位的最終狀態...")
+            try:
+                for i in range(1, 3):  # 檢查前兩個檔案欄位
+                    selector = f"input[type=\"file\"]:nth-of-type({i})"
+                    try:
+                        file_name = self.page.evaluate(f"""
+                            document.querySelector('{selector}').files[0]?.name || '無檔案'
+                        """)
+                        print(f"📋 欄位 {i} 最終狀態：{file_name}")
+                    except:
+                        print(f"📋 欄位 {i} 最終狀態：無法取得資訊")
+            except:
+                print("📋 最終驗證失敗")
             
         except Exception as e:
             raise Exception(f"上傳申請文件失敗: {str(e)}")
@@ -419,7 +547,7 @@ class WebsiteAutomation:
             # 生成截圖檔名
             timestamp = self._generate_timestamp()
             screenshot_name = f"申請截圖_2025年10月_{timestamp}_{screenshot_type}.png"
-            screenshot_path = os.path.join("..", "申請截圖", screenshot_name)
+            screenshot_path = os.path.join("..", "..", "申請截圖", screenshot_name)
             
             # 截圖
             self.page.screenshot(
