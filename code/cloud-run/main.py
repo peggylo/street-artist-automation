@@ -523,6 +523,70 @@ def process_application():
             "error": str(e)
         }), 500
 
+@app.route('/website-automation', methods=['POST'])
+def website_automation():
+    """
+    Phase 6: 網站自動化端點
+    
+    預期的 JSON 格式：
+    {
+        "user_id": "用戶ID",
+        "application_data": {
+            "year": "2025",
+            "month": "10",
+            "selected_dates": ["2025/10/5"],
+            "video_url": "https://drive.google.com/...",
+            "video_source": "常用影片",
+            "timestamp": "20251012-0316"
+        }
+    }
+    """
+    try:
+        # 解析請求資料
+        request_data = request.get_json()
+        if not request_data:
+            return jsonify({"error": "缺少請求資料"}), 400
+        
+        user_id = request_data.get("user_id")
+        application_data = request_data.get("application_data", {})
+        
+        if not user_id:
+            return jsonify({"error": "缺少用戶ID"}), 400
+        
+        logger.info(f"開始網站自動化處理: 用戶 {user_id}")
+        
+        # 導入並執行網站自動化
+        from website_automation_cloud import WebsiteAutomation
+        
+        # 建立自動化實例（Cloud Run 使用 headless 模式）
+        automation = WebsiteAutomation(headless=True)
+        
+        # 執行網站自動化
+        result = automation.run_automation(application_data)
+        
+        if result['success']:
+            logger.info(f"網站自動化成功: 用戶 {user_id}")
+            return jsonify({
+                "success": True,
+                "message": "網站自動化完成",
+                "result": result,
+                "user_id": user_id
+            })
+        else:
+            logger.error(f"網站自動化失敗: 用戶 {user_id}, 錯誤: {result.get('error')}")
+            return jsonify({
+                "success": False,
+                "error": result.get('error', '未知錯誤'),
+                "result": result
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"網站自動化處理失敗: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 if __name__ == '__main__':
-    logger.info("啟動文件處理服務")
+    logger.info("啟動文件處理與網站自動化服務")
     app.run(host='0.0.0.0', port=config.HTTP["PORT"])

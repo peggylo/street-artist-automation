@@ -27,13 +27,15 @@ code/gas/
 ### Cloud Run 專案檔案結構
 ```
 code/cloud-run/
-├── main.py                 # 主要邏輯和 HTTP 服務 [Phase 5] + 網站自動化端點 [Phase 6]
-├── config.py               # 設定檔和常數 [Phase 5] + 個人資料設定 [Phase 6]
-├── website_automation.py   # Playwright 網站自動化邏輯 [Phase 6]
-├── analyze_website.py      # 網站結構分析工具（一次性使用）[Phase 6]
-├── requirements.txt        # Python 套件清單 [Phase 5] + Playwright 依賴 [Phase 6]
-├── Dockerfile             # 容器化設定 [Phase 5] + Playwright 環境 [Phase 6]
-├── .gcloudignore          # Cloud Run 部署忽略檔案 [Phase 5]
+├── main.py                        # 主要邏輯和 HTTP 服務 [Phase 5] + 網站自動化端點 [Phase 6]
+├── config.py                      # 設定檔和常數 [Phase 5] + 個人資料設定 [Phase 6]
+├── website_automation_local.py    # 本地測試版 Playwright 自動化 [Phase 6 階段2A]
+├── website_automation_cloud.py    # Cloud Run 版 Playwright 自動化 [Phase 6 階段2A.5-2C]
+├── analyze_website.py             # 網站結構分析工具（一次性使用）[Phase 6]
+├── website_analysis_result.json   # 網站選擇器配置檔 [Phase 6]
+├── requirements.txt               # Python 套件清單 [Phase 5] + Playwright 依賴 [Phase 6]
+├── Dockerfile                     # 容器化設定 [Phase 5] + Playwright 環境 [Phase 6]
+├── .gcloudignore                  # Cloud Run 部署忽略檔案 [Phase 5]
 └── (根據實際複雜度決定是否拆分更多檔案)
 ```
 
@@ -829,6 +831,23 @@ gcloud run services update document-processor \
 **執行方式**：將 2A 成功的程式碼部署到 Cloud Run 測試
 **測試範圍**：Cloud Run 環境下的網站自動化但不提交
 **目的**：驗證 Playwright 在 Cloud Run 環境中正常運作
+
+**檔案分離決策（方案A：完全分離）**：
+- **`website_automation_local.py`**：專門用於本地測試和除錯
+  - 保留有頭模式、本地截圖、詳細除錯資訊
+  - 街頭藝人證使用本地檔案路徑
+  - 適合階段2A的快速迭代和問題診斷
+- **`website_automation_cloud.py`**：專門用於 Cloud Run 生產環境
+  - 強制無頭模式、雲端截圖上傳、精簡日誌
+  - 所有檔案都從 Google Drive 下載
+  - 適合階段2A.5-2C的雲端部署和整合測試
+
+**分離策略優勢**：
+- 階段2A已完美運作，避免冒險修改
+- 本地除錯需求和雲端部署需求差異很大
+- 開發速度優先於程式碼重用
+- 後續可重構整合，但先確保功能正常
+
 **成功標準**：
 - ✅ Cloud Run 能成功啟動 Playwright + Chromium
 - ✅ 網站自動化功能在雲端環境正常運作
