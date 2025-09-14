@@ -47,7 +47,7 @@ code/cloud-run/
 ### Phase 1: 基礎LINE Bot架構 (1-2週)
 
 #### 🎯 Phase 1 開發決策
-- **Bot名稱**：松菸申請助手
+- **Bot名稱**：表演場地申請助手
 - **測試群組**：2人群組（開發者+協助者）
 - **GAS權限設定**：
   - 執行權限：「以我的身分執行」
@@ -70,7 +70,7 @@ code/cloud-run/
 
 #### 1.1 LINE Bot基本設置 ✅ **已完成**
 - [x] 建立LINE Developer帳號和Bot
-  - Bot名稱：松菸申請助手
+  - Bot名稱：表演場地申請助手
   - Bot描述：協助視障用戶申請松山文創園區街頭藝人場地
 - [x] 設定Webhook URL（使用Google Apps Script）
 - [x] 實現基本訊息接收和回覆功能
@@ -389,7 +389,7 @@ return analyzeWithAI(text);
 - 與申請流程緊密結合，適合放在主檔案
 
 **Google Sheets 設定**：
-- Sheets ID: `1xZT5sqTTTrDxycPbJb9cuFPn59FY6m13srIkHYs3GdI`
+- Sheets ID：已設定在 config.py 中
 - 位置：街頭藝人登記/系統記錄/申請記錄
 - 權限：編輯權限僅限擁有者
 
@@ -439,6 +439,7 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **原因**：狀態儲存時 `fullDate: Date` → 取回時 `fullDate: '2025-10-03T16:00:00.000Z'`
 - **解決**：檢查 fullDate 類型，字串時轉換為 Date 物件
 - **教訓**：Cache Service 的 JSON 序列化會改變資料類型
+
 
 #### 🎯 Phase 4 實際產出 ✅ **已完成**
 **功能實現**：
@@ -538,10 +539,10 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **錯誤處理**：Cloud Run 呼叫失敗時降級到手動處理模式
 
 **Google Drive 資料夾配置**：
-- **Word 模板檔案 ID**：`1OyDVT24n5INLcymXWBpDFHlKBbV_QZQE` (申請表模板.docx)
-- **PDF 模板檔案 ID**：`19rgpiPJPrf_ZWDTBa-wn3ipnS1QXdlVg` (申請表模板.pdf)
-- **模板資料夾 ID**：`1mceVVtspzw9ZnP1094FC30fj0H3fFPAq` (申請文件/模板)
-- **生成文件資料夾 ID**：`1gVbcQRru4gBlhIyawELVnYmaDwqLNtGd` (申請文件/生成文件)
+- **Word 模板檔案 ID**：已設定在 config.py 中
+- **PDF 模板檔案 ID**：已設定在 config.py 中
+- **模板資料夾 ID**：已設定在 config.py 中
+- **生成文件資料夾 ID**：已設定在 config.py 中
 
 **檔案命名規則**：
 - **Word 複製檔名**：`申請表_YYYY年MM月_YYYYMMDD-HHmmss_待處理.docx`（如：申請表_2025年10月_20250912-022107_待處理.docx）
@@ -663,7 +664,7 @@ K. 處理完成時間 (空白，Phase 5 填入)
 
 **重要說明**：
 - **Phase 5 完成** = 文件處理完成，可供人工下載使用
-- **Phase 6 完成** = 整個申請流程完成，真正提交到松菸網站
+- **Phase 6 完成** = 整個申請流程完成，真正提交到表演場地網站
 
 #### 5.6 階段測試里程碑 ✅ **已完成**
 - [x] ✅ Cloud Run 服務能正常部署和運行
@@ -706,7 +707,7 @@ K. 處理完成時間 (空白，Phase 5 填入)
 
 #### 📋 Phase 6 範疇定義
 **Phase 6 專注於**：
-- **網站自動化**：松菸網站申請流程自動化
+- **網站自動化**：表演場地網站申請流程自動化
 - **端到端整合**：完整申請流程串接
 - **用戶測試**：實際使用驗證和優化
 - **上線準備**：生產環境部署
@@ -720,17 +721,16 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **使用既有Sheets欄位**：透過錯誤訊息區分失敗階段
 
 **個人資料設定**：
-- 申請者固定資料已加入 `config.py` 中的 `APPLICANT_INFO` 設定
-- 街頭藝人證照檔案已加入 `config.py` 中的 `CERTIFICATE` 設定
-- **個人資料安全化**：將 `APPLICANT_INFO` 移至 Google Secret Manager 存放，提升安全性
+- **個人資料安全化**：將 `APPLICANT_INFO` 移至 Google Secret Manager 存放，提升安全性 ✅
+- 街頭藝人證照檔案已加入 `config.py` 中的 `CERTIFICATE` 設定 ✅
 
 **網站結構分析策略**：
 - **階段1**：網站結構分析（一次性）- 獨立檔案 `analyze_website.py`
 - **階段2A-2C**：自動化執行（重複使用）- 主要邏輯 `website_automation.py`
 
 **兩頁式網站架構**：
-- **第一頁（固定網址）**：`https://www.songshanculturalpark.org/solicitation` - 徵件活動列表頁
-- **第二頁（動態網址）**：`https://www.songshanculturalpark.org/solicitation/submission/[動態ID]` - 申請表單頁
+- **第一頁（固定網址）**：已設定在 config.py 中 - 徵件活動列表頁
+- **第二頁（動態網址）**：已設定在 config.py 中 - 申請表單頁
 
 **街頭藝人標題辨識策略**：
 - **關鍵字匹配**：只需包含「街頭藝人」四個字即可辨識
@@ -739,7 +739,7 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **申請期限**：不需驗證，網站只會顯示可申請的連結
 
 **截圖功能設計**：
-- **存儲位置**：Google Drive 資料夾ID `1Ef0-1MQzuhUormRVICRF_6d_Gi-veCOM`
+- **存儲位置**：Google Drive 專用資料夾（ID 已設定在 config.py）
 - **命名格式**：`申請截圖_YYYY年MM月_YYYYMMDD-HHmmss_狀態.png`
 - **截圖時機**：
   1. 填寫完成截圖（提交前）
@@ -747,9 +747,9 @@ K. 處理完成時間 (空白，Phase 5 填入)
   3. 失敗截圖（失敗點畫面）
 
 **網站表單選擇器整合**：
-- **階段1分析結果**：已將 `analyze_website.py` 的選擇器結果整合到 `config.py`
-- **FORM_SELECTORS 配置**：包含第一頁和表單頁的所有必要選擇器
-- **JSON檔案清理**：刪除 `website_analysis_result.json`，避免重複配置
+- **階段1分析結果**：已將 `analyze_website.py` 的選擇器結果整合到 `website_analysis_result.json` ✅
+- **動態載入配置**：`config.py` 動態載入 `website_analysis_result.json` 中的選擇器 ✅
+- **JSON檔案保留**：保留 `website_analysis_result.json` 作為主要配置來源 ✅
 
 **狀態管理重新定義**：
 ```
@@ -788,9 +788,9 @@ gcloud run services update document-processor \
 **開發策略**：
 - **使用真實資料**：所有測試使用真實申請資料
 - **Git管理**：單人開發，直接在main分支開發
-- **測試環境**：真實松菸網站，階段性控制提交
+- **測試環境**：真實表演場地網站，階段性控制提交
 
-### **階段1：網站結構分析**
+### **階段1：網站結構分析** ✅ **已完成**
 **執行方式**：本地Cursor執行 `analyze_website.py`
 **成功標準**：
 - ✅ 找到姓名、手機、信箱輸入欄位的selector
@@ -800,17 +800,30 @@ gcloud run services update document-processor \
 - ✅ 找到提交按鈕
 - ✅ 輸出完整的selector配置檔
 
-### **階段2A：基礎網站自動化**
+**重要決策**：
+- **選項C匹配策略**：採用「包含「街頭藝人」和（「展演申請」或「申請」）」的精確匹配
+- **移除硬編碼**：避免依賴特定競爭項目名稱
+- **有頭模式調試**：使用非headless模式進行視覺化調試
+- **JSON結構化輸出**：包含選擇器、匹配邏輯、分析元數據和技術註記
+
+### **階段2A：基礎網站自動化** ✅ **已完成**
 **執行方式**：本地Cursor測試 `website_automation.py`
 **測試範圍**：填寫表單但不提交
 **成功標準**：
-- ✅ 能開啟松菸網站
+- ✅ 能開啟表演場地網站
 - ✅ 能填寫所有表單欄位（真實個人資料）
 - ✅ 能上傳申請PDF和街頭藝人證
 - ✅ 能處理reCAPTCHA（點擊驗證）
 - ✅ 能勾選同意條款
-- ✅ 截圖「填寫完成」並存入Google Drive
+- ✅ 截圖「填寫完成」並存入本地資料夾
 - ✅ **停在提交前，不按送出按鈕**
+
+**重要決策**：
+- **本地截圖策略**：階段2A使用本地 `申請截圖/` 資料夾，提升調試效率
+- **動態選擇器載入**：從 `website_analysis_result.json` 動態載入選擇器配置
+- **導航邏輯優化**：實現選項C匹配策略，確保點擊正確的「我要申請」按鈕
+- **檔案上傳處理**：先從Google Drive下載檔案到本地，再上傳到網站
+- **Secret Manager整合**：個人資料從Google Secret Manager動態載入
 
 ### **階段2A.5：Cloud Run 驗證**
 **執行方式**：將 2A 成功的程式碼部署到 Cloud Run 測試
@@ -862,7 +875,7 @@ gcloud run services update document-processor \
 📋 申請PDF：[Google Drive連結]
 🏆 街頭藝人證：[Google Drive連結]
 
-請家人手動到松菸網站提交
+請家人手動到表演場地網站提交
 ```
 + 直接傳送1張錯誤截圖
 
@@ -914,25 +927,60 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 - 存儲位置：Google Drive專用資料夾
 
 #### 6.1 階段開發任務
-- [ ] **階段1**：建立網站結構分析工具（analyze_website.py）
-- [ ] **階段2A**：實現基礎網站自動化（不提交）
+- [x] **階段1**：建立網站結構分析工具（analyze_website.py）✅ **已完成**
+- [x] **階段2A**：實現基礎網站自動化（不提交）✅ **已完成**
+- [ ] **階段2A.5**：Cloud Run 驗證（Playwright環境測試）
 - [ ] **階段2B**：完整系統整合測試（含LINE通知）
 - [ ] **階段2C**：真實提交測試和驗證
 
 #### 6.2 技術實作任務
-- [ ] 實現表單自動填寫功能（固定個人資料）
-- [ ] 實現雙檔案上傳（申請PDF+街頭藝人證照）
-- [ ] 建立三個時機截圖功能
-- [ ] 處理reCAPTCHA驗證
-- [ ] 實現重試機制和錯誤處理
+- [x] 實現表單自動填寫功能（固定個人資料）✅ **已完成**
+- [x] 實現雙檔案上傳（申請PDF+街頭藝人證照）✅ **已完成**
+- [x] 建立本地截圖功能（階段2A）✅ **已完成**
+- [x] 處理reCAPTCHA驗證（點擊策略）✅ **已完成**
+- [x] 實現重試機制和錯誤處理✅ **已完成**
+- [x] 動態選擇器載入機制✅ **已完成**
 - [ ] 建立Cloud Run→GAS→LINE通知機制
 - [ ] 新增Google Sheets截圖連結欄位
+- [ ] 建立Google Drive截圖上傳功能
 
 #### 6.3 整合測試任務
 - [ ] 完整申請流程串接（LINE對話→文件處理→網站提交）
 - [ ] 錯誤處理和通知機制完善（含截圖直傳）
 - [ ] 超時處理機制（各階段超時設定）
 - [ ] 人工處理流程（失敗時通知+檔案下載）
+
+#### 🔧 Phase 6 重要 Debug 經驗
+
+**Python版本相容性問題**：
+- **問題**：Python 3.13.5 與 Playwright 的 `greenlet` 依賴不相容
+- **錯誤**：`error: Microsoft Visual C++ 14.0 is required`
+- **解決**：降級到 Python 3.12，建立虛擬環境
+- **教訓**：Playwright 對 Python 版本有特定要求
+
+**Playwright 瀏覽器啟動問題**：
+- **問題**：Playwright 無法找到 Chromium 執行檔
+- **錯誤**：`Executable doesn't exist`
+- **解決**：執行 `playwright install chromium` 安裝瀏覽器
+- **教訓**：Playwright 需要額外安裝瀏覽器執行檔
+
+**選擇器語法相容性**：
+- **問題**：`text*=` 選擇器在 Playwright 1.40.0 中不支援
+- **錯誤**：`Unknown engine "text*="`
+- **解決**：改用 XPath 語法 `xpath=//*[contains(text(), 'keyword')]`
+- **教訓**：不同 Playwright 版本支援的選擇器語法不同
+
+**導航邏輯錯誤**：
+- **問題**：點擊錯誤的「我要申請」按鈕
+- **原因**：使用 `.first` 選擇器，總是選擇第一個按鈕
+- **解決**：實現選項C匹配策略，精確識別包含「街頭藝人」的按鈕
+- **教訓**：網站有多個相似元素時，需要更精確的匹配邏輯
+
+**截圖路徑問題**：
+- **問題**：截圖保存到錯誤的目錄
+- **原因**：相對路徑 `申請截圖/` 指向當前目錄而非專案根目錄
+- **解決**：使用 `../申請截圖/` 指向專案根目錄
+- **教訓**：注意工作目錄與檔案路徑的關係
 
 ---
 
@@ -1001,5 +1049,5 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 
 ---
 
-**最後更新**: 2025年9月12日  
-**版本**: v5.0 - Phase 5 完成
+**最後更新**: 2025年9月14日  
+**版本**: v6.0 - Phase 6 階段1-2A 完成
