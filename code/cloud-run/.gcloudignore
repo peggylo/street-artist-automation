@@ -31,4 +31,4 @@ venv/
 env/
 .venv/
 analyze_website.py
-website_analysis_result.json
+# website_analysis_result.json - 需要部署到 Cloud Run

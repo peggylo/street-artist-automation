@@ -1,0 +1,18 @@
+{
+  "first_page": {
+    "street_artist_text_selector": "xpath=//*[contains(text(), '街頭藝人')]",
+    "apply_button_selector": "xpath=//*[contains(text(), '我要申請')]",
+    "found_link": "/solicitation/submission/ddd666c5-d7cb-471d-80bc-4cf7513f51c7"
+  },
+  "form_page": {
+    "name_input": "input[placeholder*=\"姓名\"]",
+    "phone_input": "input[placeholder*=\"手機\"]",
+    "email_input": "input[placeholder*=\"信箱\"]",
+    "pdf_upload": "input[type=\"file\"]:nth-of-type(1)",
+    "certificate_upload": "input[type=\"file\"]:nth-of-type(2)",
+    "recaptcha_frame": "iframe[src*=\"recaptcha\"]",
+    "recaptcha_checkbox": ".recaptcha-checkbox-border",
+    "agreement_checkbox": "input[type=\"checkbox\"]:nth-of-type(1)",
+    "submit_button": "button:has-text(\"確認\")"
+  }
+}

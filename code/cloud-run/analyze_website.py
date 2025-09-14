@@ -28,14 +28,9 @@ class WebsiteAnalyzer:
         print("-" * 50)
         
         async with async_playwright() as p:
-            # 啟動瀏覽器（先嘗試無頭模式）
-            try:
-                browser = await p.chromium.launch(headless=True)
-                print("✅ 成功啟動 Chromium（無頭模式）")
-            except Exception as e:
-                print(f"⚠️ 無頭模式啟動失敗，嘗試有頭模式: {e}")
-                browser = await p.chromium.launch(headless=False)
-                print("✅ 成功啟動 Chromium（有頭模式）")
+            # 啟動瀏覽器（使用有頭模式以便觀察）
+            browser = await p.chromium.launch(headless=False)
+            print("✅ 成功啟動 Chromium（有頭模式）")
             
             page = await browser.new_page()
             
@@ -77,30 +72,77 @@ class WebsiteAnalyzer:
         
         print(f"✅ 找到 {len(street_artist_elements)} 個包含「{self.keyword}」的元素")
         
-        # 尋找可點擊的連結
+        # 尋找可點擊的連結（需要更精確的匹配）
         application_link = None
-        for element in street_artist_elements:
+        for i, element in enumerate(street_artist_elements):
             # 檢查是否為連結或包含連結
             parent_link = element.locator('xpath=ancestor-or-self::a').first
             if await parent_link.count() > 0:
                 link_text = await element.text_content()
                 link_href = await parent_link.get_attribute('href')
-                print(f"📝 找到連結文字: {link_text.strip()}")
+                print(f"📝 找到連結文字 {i+1}: {link_text.strip()}")
                 print(f"🔗 連結網址: {link_href}")
-                application_link = link_href
-                break
+                
+                # 選項C：更精確匹配 - 包含「街頭藝人」和（「展演申請」或「申請」）
+                has_street_artist = "街頭藝人" in link_text
+                has_application = "展演申請" in link_text or "申請" in link_text
+                
+                print(f"🔍 連結 {i+1} 匹配檢查:")
+                print(f"   包含「街頭藝人」: {has_street_artist}")
+                print(f"   包含「申請」相關: {has_application}")
+                
+                if has_street_artist and has_application:
+                    print(f"✅ 確認為街頭藝人申請連結（正面匹配成功）")
+                    application_link = link_href
+                    await parent_link.click()
+                    break
+                else:
+                    print(f"⚠️ 跳過：不符合街頭藝人申請條件")
+                    continue
         
         if not application_link:
-            # 嘗試找「我要申請」按鈕
+            # 嘗試找「我要申請」按鈕（分析每個按鈕對應的內容）
+            print("🔍 透過「我要申請」按鈕尋找街頭藝人申請...")
             apply_buttons = await page.locator("xpath=//*[contains(text(), '我要申請')]").all()
-            for button in apply_buttons:
+            
+            for i, button in enumerate(apply_buttons):
                 parent_link = button.locator('xpath=ancestor-or-self::a').first
                 if await parent_link.count() > 0:
                     link_href = await parent_link.get_attribute('href')
-                    print(f"📝 找到「我要申請」按鈕")
+                    print(f"📝 分析「我要申請」按鈕 {i+1}")
                     print(f"🔗 按鈕連結: {link_href}")
-                    application_link = link_href
-                    break
+                    
+                    # 分析按鈕所屬的整個內容區塊
+                    # 向上找到包含完整資訊的父容器
+                    container = button.locator('xpath=ancestor::*[contains(@class, "item") or contains(@class, "card") or contains(@class, "content")]').first
+                    if await container.count() == 0:
+                        # 如果沒有找到特定容器，向上找較大的區塊
+                        container = button.locator('xpath=ancestor::div[position()<=3]').last
+                    
+                    if await container.count() > 0:
+                        container_text = await container.text_content()
+                        print(f"📄 按鈕 {i+1} 完整內容區塊:")
+                        print(f"   {container_text.strip()[:200]}...")
+                        
+                        # 選項C：更精確匹配 - 包含「街頭藝人」和（「展演申請」或「申請」）
+                        has_street_artist = "街頭藝人" in container_text
+                        has_application = "展演申請" in container_text or "申請" in container_text
+                        
+                        print(f"🔍 按鈕 {i+1} 匹配檢查:")
+                        print(f"   包含「街頭藝人」: {has_street_artist}")
+                        print(f"   包含「申請」相關: {has_application}")
+                        
+                        if has_street_artist and has_application:
+                            print(f"✅ 確認為街頭藝人申請按鈕（正面匹配成功）")
+                            application_link = link_href
+                            await parent_link.click()
+                            break
+                        else:
+                            print(f"⚠️ 跳過：不符合街頭藝人申請條件")
+                            continue
+                    else:
+                        print(f"⚠️ 無法取得按鈕 {i+1} 的內容區塊")
+                        continue
         
         if not application_link:
             raise Exception("❌ 找不到街頭藝人申請的可點擊連結")
