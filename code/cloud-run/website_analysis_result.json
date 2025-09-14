@@ -10,9 +10,9 @@
       "email_input": "input[placeholder*=\"信箱\"]",
       "pdf_upload": "input[type=\"file\"][accept=\".pdf\"]",
       "certificate_upload": "input[type=\"file\"]:not([accept=\".pdf\"])",
-      "recaptcha_frame": "iframe[src*=\"recaptcha\"]",
+      "recaptcha_frame": "iframe[src*=\"recaptcha\"]:visible",
       "recaptcha_checkbox": ".recaptcha-checkbox-border",
-      "agreement_checkbox": "input[type=\"checkbox\"]:nth-of-type(1)",
+      "agreement_checkbox": "input#signup",
       "submit_button": "button:has-text(\"確認\")"
     }
   },

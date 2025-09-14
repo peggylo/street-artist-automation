@@ -517,14 +517,95 @@ class WebsiteAutomation:
         try:
             print("✅ 勾選同意條款...")
             
-            agreement_selector = self.analysis_result['selectors']['form_page']['agreement_checkbox']
-            self.page.wait_for_selector(agreement_selector, timeout=10000)
+            # 除錯：列出頁面中所有的 checkbox
+            print("🔍 除錯：檢查頁面上所有 checkbox...")
+            all_checkboxes = self.page.locator('input[type="checkbox"]').all()
+            print(f"📊 找到 {len(all_checkboxes)} 個 checkbox：")
             
+            for i, checkbox in enumerate(all_checkboxes):
+                try:
+                    element_id = checkbox.get_attribute('id') or "無ID"
+                    element_name = checkbox.get_attribute('name') or "無name"
+                    element_class = checkbox.get_attribute('class') or "無class"
+                    is_visible = checkbox.is_visible()
+                    is_enabled = checkbox.is_enabled()
+                    is_checked = checkbox.is_checked()
+                    
+                    print(f"  Checkbox {i+1}:")
+                    print(f"    ID: {element_id}")
+                    print(f"    Name: {element_name}")
+                    print(f"    Class: {element_class}")
+                    print(f"    可見: {is_visible}")
+                    print(f"    啟用: {is_enabled}")
+                    print(f"    已勾選: {is_checked}")
+                    
+                    # 查找附近的文字內容
+                    try:
+                        parent_text = checkbox.locator('xpath=../..').text_content()[:100] if checkbox.locator('xpath=../..').count() > 0 else ""
+                        print(f"    附近文字: {parent_text.strip()}")
+                    except:
+                        print(f"    附近文字: 無法取得")
+                        
+                except Exception as e:
+                    print(f"  Checkbox {i+1}: 無法取得資訊 - {str(e)}")
+            
+            agreement_selector = self.analysis_result['selectors']['form_page']['agreement_checkbox']
+            print(f"🔍 使用選擇器尋找同意條款：{agreement_selector}")
+            
+            # 先檢查選擇器是否能找到元素
+            agreement_elements = self.page.locator(agreement_selector).all()
+            print(f"📊 選擇器找到 {len(agreement_elements)} 個匹配元素")
+            
+            if len(agreement_elements) == 0:
+                # 嘗試備用選擇器
+                print("🔄 嘗試備用選擇器...")
+                backup_selectors = [
+                    "input[type=\"checkbox\"]:last-of-type",
+                    "input[type=\"checkbox\"]",
+                    "input[type=\"checkbox\"]:nth-of-type(2)",
+                    "input[type=\"checkbox\"]:nth-of-type(3)"
+                ]
+                
+                for backup_selector in backup_selectors:
+                    try:
+                        backup_elements = self.page.locator(backup_selector).all()
+                        print(f"🔍 備用選擇器 {backup_selector}：找到 {len(backup_elements)} 個元素")
+                        
+                        if len(backup_elements) > 0:
+                            backup_checkbox = self.page.locator(backup_selector).first
+                            if backup_checkbox.is_visible() and backup_checkbox.is_enabled():
+                                print(f"✅ 使用備用選擇器：{backup_selector}")
+                                if not backup_checkbox.is_checked():
+                                    backup_checkbox.click()
+                                    print("✅ 已勾選同意條款（備用方案）")
+                                else:
+                                    print("✅ 同意條款已經勾選（備用方案）")
+                                return
+                    except Exception as backup_error:
+                        print(f"❌ 備用選擇器 {backup_selector} 失敗：{str(backup_error)}")
+                        continue
+                
+                raise Exception(f"所有選擇器都找不到可用的同意條款 checkbox")
+            
+            # 跳過 wait_for_selector，直接操作已知存在的元素（可能隱藏）
+            print(f"⏳ 直接操作同意條款元素（跳過等待）...")
             agreement_checkbox = self.page.locator(agreement_selector)
             
-            if not agreement_checkbox.is_checked():
-                agreement_checkbox.click()
-                print("✅ 已勾選同意條款")
+            # 檢查 checkbox 狀態（即使隱藏也可以操作）
+            is_checked = agreement_checkbox.is_checked()
+            print(f"📋 同意條款狀態：已勾選={is_checked}")
+            
+            if not is_checked:
+                # 使用 JavaScript 強制點擊（即使元素隱藏）
+                self.page.evaluate(f"""
+                    document.querySelector('{agreement_selector}').click()
+                """)
+                print("✅ 已勾選同意條款（JavaScript點擊）")
+                
+                # 驗證點擊結果
+                time.sleep(0.5)
+                final_checked = agreement_checkbox.is_checked()
+                print(f"📋 點擊後狀態：已勾選={final_checked}")
             else:
                 print("✅ 同意條款已經勾選")
                 
