@@ -23,6 +23,11 @@ code/cloud-run/config.py
 templates/*.docx
 templates/*.doc
 
+# 申請相關資料夾（包含個資和生成文件）
+系統記錄/
+申請截圖/
+申請文件/
+
 # 影片和圖片檔案
 *.mp4
 *.mov
