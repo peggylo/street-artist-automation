@@ -1661,3 +1661,53 @@ function copyWordTemplate(applicationData) {
     };
   }
 }
+
+// =====================================================
+// 系統維護函數
+// =====================================================
+
+/**
+ * 每日自動喚醒函數 - 保持服務活躍
+ * 防止 GAS 部署因長時間未使用而失效
+ * 
+ * 設定方式：
+ * 1. GAS 編輯器 → 觸發條件 → 新增觸發條件
+ * 2. 函數：dailyKeepAlive
+ * 3. 事件來源：時間驅動 → 日計時器
+ * 4. 時間：每天上午 8-9 點
+ */
+function dailyKeepAlive() {
+  try {
+    console.log('🔄 每日自動喚醒執行 - ' + new Date());
+    
+    // 簡單的操作來保持服務活躍
+    const testData = {
+      timestamp: new Date(),
+      status: 'alive',
+      message: '系統正常運作',
+      version: 'v1.0'
+    };
+    
+    console.log('✅ 喚醒成功:', JSON.stringify(testData));
+    
+    // 可選：檢查重要配置是否存在
+    try {
+      validateConfig();
+      console.log('✅ 系統配置檢查通過');
+    } catch (configError) {
+      console.warn('⚠️ 系統配置檢查失敗:', configError.message);
+    }
+    
+    return testData;
+    
+  } catch (error) {
+    console.error('❌ 喚醒失敗:', error);
+    console.error('📋 錯誤詳情:', error.stack);
+    return {
+      timestamp: new Date(),
+      status: 'error',
+      message: '喚醒失敗',
+      error: error.message
+    };
+  }
+}

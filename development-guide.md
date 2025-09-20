@@ -827,10 +827,10 @@ gcloud run services update document-processor \
 - **檔案上傳處理**：先從Google Drive下載檔案到本地，再上傳到網站
 - **Secret Manager整合**：個人資料從Google Secret Manager動態載入
 
-### **階段2A.5：Cloud Run 驗證**
-**執行方式**：將 2A 成功的程式碼部署到 Cloud Run 測試
-**測試範圍**：Cloud Run 環境下的網站自動化但不提交
-**目的**：驗證 Playwright 在 Cloud Run 環境中正常運作
+### **階段2B：完整系統整合（含 Cloud Run 驗證）**
+**執行方式**：LINE申請觸發完整流程
+**測試範圍**：端到端流程但不提交
+**整合重點**：同時驗證 Playwright 在 Cloud Run 環境和完整系統串接
 
 **檔案分離決策（方案A：完全分離）**：
 - **`website_automation_local.py`**：專門用於本地測試和除錯
@@ -840,7 +840,7 @@ gcloud run services update document-processor \
 - **`website_automation_cloud.py`**：專門用於 Cloud Run 生產環境
   - 強制無頭模式、雲端截圖上傳、精簡日誌
   - 所有檔案都從 Google Drive 下載
-  - 適合階段2A.5-2C的雲端部署和整合測試
+  - 適合階段2B-2C的雲端部署和整合測試
 
 **分離策略優勢**：
 - 階段2A已完美運作，避免冒險修改
@@ -849,21 +849,21 @@ gcloud run services update document-processor \
 - 後續可重構整合，但先確保功能正常
 
 **成功標準**：
-- ✅ Cloud Run 能成功啟動 Playwright + Chromium
+- ✅ Cloud Run 能成功啟動 Playwright + Chromium（技術驗證）
+- ✅ LINE申請 → GAS處理 → Cloud Run文件+網站處理（系統整合）
 - ✅ 網站自動化功能在雲端環境正常運作
-- ✅ 截圖功能在 Cloud Run 中正常存入 Google Drive
-- ✅ 確認無環境差異問題
-- ✅ **停在提交前，不按送出按鈕**
-
-### **階段2B：完整系統整合**
-**執行方式**：LINE申請觸發完整流程
-**測試範圍**：端到端流程但不提交
-**成功標準**：
-- ✅ LINE申請 → GAS處理 → Cloud Run文件+網站處理
+- ✅ 截圖功能正常存入 Google Drive
 - ✅ 狀態正確更新到Google Sheets
 - ✅ LINE通知機制正常（含截圖直傳）
 - ✅ 錯誤處理和重試機制運作
 - ✅ **停在提交前，不按送出按鈕**
+
+**設計決策說明**：
+原本規劃的階段2A.5（純 Cloud Run 驗證）與階段2B（系統整合）合併，因為：
+- 階段2A本地測試已完全成功，技術風險較低
+- 主要挑戰是 Dockerfile 配置，屬於已知問題
+- 直接測試真實使用場景更有實際價值
+- 提升開發效率，避免重複測試相同功能
 
 ### **階段2C：真實提交測試**
 **執行方式**：LINE申請觸發，真實提交
@@ -948,8 +948,7 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 #### 6.1 階段開發任務
 - [x] **階段1**：建立網站結構分析工具（analyze_website.py）✅ **已完成**
 - [x] **階段2A**：實現基礎網站自動化（不提交）✅ **已完成**
-- [ ] **階段2A.5**：Cloud Run 驗證（Playwright環境測試）
-- [ ] **階段2B**：完整系統整合測試（含LINE通知）
+- [ ] **階段2B**：完整系統整合測試（含 Cloud Run 驗證 + LINE通知）
 - [ ] **階段2C**：真實提交測試和驗證
 
 #### 6.2 技術實作任務
@@ -1037,6 +1036,51 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 1. 檢查 Webhook URL 是否正確
 2. 確認 GAS 專案已部署為網頁應用程式
 3. 檢查權限設定是否允許匿名存取
+4. 檢查 GAS 部署是否過期（建議設定每日自動喚醒觸發器）
+
+#### GAS 服務穩定性維護
+**問題**：GAS 部署會因長時間未使用而失效，導致 LINE Bot 無回應
+
+**解決方案**：設定每日自動喚醒觸發器
+1. **建立喚醒函數**（在 GAS 中新增）：
+```javascript
+/**
+ * 每日自動喚醒函數 - 保持服務活躍
+ */
+function dailyKeepAlive() {
+  try {
+    console.log('🔄 每日自動喚醒執行 - ' + new Date());
+    
+    // 簡單的操作來保持服務活躍
+    const testData = {
+      timestamp: new Date(),
+      status: 'alive',
+      message: '系統正常運作'
+    };
+    
+    console.log('✅ 喚醒成功:', JSON.stringify(testData));
+    return testData;
+    
+  } catch (error) {
+    console.error('❌ 喚醒失敗:', error);
+    return null;
+  }
+}
+```
+
+2. **設定時間觸發器**：
+   - 在 GAS 編輯器左側點擊「觸發條件」（⏰）
+   - 點擊「新增觸發條件」
+   - 設定：
+     - 函數：`dailyKeepAlive`
+     - 事件來源：時間驅動
+     - 時間型觸發條件：日計時器
+     - 時間：每天上午 8-9 點
+
+**效果**：
+- 防止 GAS 部署因長時間未使用而失效
+- 維持 OAuth 權限有效性
+- 大幅降低需要重新部署的頻率
 
 ### OpenAI API 調用失敗
 1. 檢查 API Key 是否正確
@@ -1069,4 +1113,4 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 ---
 
 **最後更新**: 2025年9月14日  
-**版本**: v6.0 - Phase 6 階段1-2A 完成
+**版本**: v6.1 - Phase 6 階段1-2A 完成，階段2A.5與2B合併

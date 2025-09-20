@@ -1,13 +1,13 @@
 # 街頭藝人申請系統 - Cloud Run Dockerfile
 # Phase 6: 網站自動化系統（包含 Phase 5 文件處理）
 
-# 使用官方 Python 3.11 slim 映像檔作為基底
-FROM python:3.11-slim
+# 使用官方 Playwright Python 映像檔作為基底
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 # 設定工作目錄
 WORKDIR /app
 
-# 安裝基本系統依賴
+# 安裝 LibreOffice（文件處理需求）
 RUN apt-get update && apt-get install -y \
     libreoffice \
     fonts-noto-cjk \
@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 複製 requirements.txt 並安裝 Python 依賴（暫時跳過 Playwright）
+# 複製 requirements.txt 並安裝 Python 依賴
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
