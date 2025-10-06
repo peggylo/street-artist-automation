@@ -248,6 +248,85 @@ class DocumentProcessor:
             logger.error(f"PDF 轉換失敗: {str(e)}")
             raise
     
+    def upload_word(self, word_path, application_data):
+        """
+        上傳 Word 到 Google Drive（方案 B：覆蓋現有檔案）
+        
+        Args:
+            word_path (str): Word 檔案路徑
+            application_data (dict): 申請資料
+            
+        Returns:
+            str: 上傳後的檔案連結
+        """
+        try:
+            # 檢查是否為方案 B（有 copiedFileId）
+            copied_file_id = application_data.get("copiedFileId")
+            
+            if copied_file_id:
+                logger.info(f"方案 B: 覆蓋現有 Word 檔案 {copied_file_id}")
+                
+                # 覆蓋現有檔案
+                media = MediaFileUpload(
+                    word_path, 
+                    mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                )
+                
+                file = self.drive_service.files().update(
+                    fileId=copied_file_id,
+                    media_body=media,
+                    fields='id,webViewLink'
+                ).execute()
+                
+                file_id = file.get('id')
+                file_url = file.get('webViewLink')
+                
+                logger.info(f"Word 覆蓋完成: {file_url}")
+                return file_url
+                
+            else:
+                logger.info("方案 A: 建立新 Word 檔案")
+                
+                # 生成檔案名稱
+                year = application_data.get("year")
+                month = application_data.get("month")
+                
+                # 檢查必要參數
+                if not year or not month:
+                    raise ValueError(f"缺少必要參數: year={year}, month={month}")
+                
+                # 使用與 PDF 類似的命名規則，但加上 _待處理 後綴
+                timestamp = application_data.get("timestamp", "")
+                filename = f"申請表_{year}年{month}月_{timestamp}_待處理.docx"
+                
+                # 建立新檔案
+                folder_id = config.GOOGLE_DRIVE["GENERATED_FOLDER_ID"]
+                media = MediaFileUpload(
+                    word_path, 
+                    mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                )
+                
+                file_metadata = {
+                    'name': filename,
+                    'parents': [folder_id]
+                }
+                
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id,webViewLink'
+                ).execute()
+                
+                file_id = file.get('id')
+                file_url = file.get('webViewLink')
+                
+                logger.info(f"Word 上傳完成: {file_url}")
+                return file_url
+            
+        except Exception as e:
+            logger.error(f"Word 上傳失敗: {str(e)}")
+            raise
+    
     def upload_pdf(self, pdf_path, application_data):
         """
         上傳 PDF 到 Google Drive（方案 B：覆蓋現有檔案）
@@ -467,6 +546,10 @@ def process_application():
                 filled_word_path = os.path.join(temp_dir, "filled_template.docx")
                 doc_processor.fill_template(copied_word_path, app_data, filled_word_path)
                 
+                # 2.5. 上傳填寫後的 Word 回 Google Drive
+                word_url = doc_processor.upload_word(filled_word_path, app_data)
+                logger.info(f"Word 檔案已上傳: {word_url}")
+                
                 # 3. 轉換為 PDF
                 pdf_path = doc_processor.convert_to_pdf(filled_word_path, temp_dir)
                 
@@ -488,6 +571,10 @@ def process_application():
                 # 2. 填寫模板
                 filled_word_path = os.path.join(temp_dir, "filled_template.docx")
                 doc_processor.fill_template(template_path, app_data, filled_word_path)
+                
+                # 2.5. 上傳填寫後的 Word 到 Google Drive
+                word_url = doc_processor.upload_word(filled_word_path, app_data)
+                logger.info(f"Word 檔案已上傳: {word_url}")
                 
                 # 3. 轉換為 PDF
                 pdf_path = doc_processor.convert_to_pdf(filled_word_path, temp_dir)

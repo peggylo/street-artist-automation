@@ -50,6 +50,37 @@ function doGet(e) {
 }
 
 /**
+ * 驗證系統配置
+ * 檢查必要的配置是否正確載入
+ */
+function validateConfig() {
+  try {
+    // 檢查 CONFIG 是否存在
+    if (typeof CONFIG === 'undefined') {
+      throw new Error('CONFIG 未定義');
+    }
+    
+    // 檢查 LINE 配置
+    const lineConfig = getLineConfig();
+    if (!lineConfig) {
+      throw new Error('LINE 配置未載入');
+    }
+    
+    // 檢查 ACCESS_TOKEN（對應 Config.js 中 getLineConfig() 返回的屬性名稱）
+    if (!lineConfig.ACCESS_TOKEN) {
+      throw new Error('LINE Access Token 未設定');
+    }
+    
+    // 配置檢查通過
+    return true;
+    
+  } catch (error) {
+    console.error('❌ 配置驗證失敗:', error.message);
+    throw error;
+  }
+}
+
+/**
  * 處理 LINE 事件
  */
 function handleLineEvent(event) {
