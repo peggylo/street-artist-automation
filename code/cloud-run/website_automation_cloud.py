@@ -32,6 +32,7 @@ from playwright.sync_api import sync_playwright, Page, Browser
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from google.cloud import storage
 import pytz
 import io
 
@@ -61,6 +62,9 @@ class WebsiteAutomationCloud:
         # 初始化 Google Drive 服務
         self.drive_service = self._init_drive_service()
         
+        # 初始化 Google Cloud Storage 服務
+        self.gcs_client = self._init_gcs_client()
+        
         print(f"🚀 Cloud Run 網站自動化初始化完成（階段 {stage}）")
         print(f"📁 臨時目錄：{self.temp_dir}")
     
@@ -75,6 +79,17 @@ class WebsiteAutomationCloud:
             return build('drive', 'v3', credentials=credentials)
         except Exception as e:
             raise Exception(f"初始化 Google Drive 服務失敗: {str(e)}")
+    
+    def _init_gcs_client(self):
+        """初始化 Google Cloud Storage 服務"""
+        try:
+            service_account_info = self.config.get_service_account_info()
+            credentials = service_account.Credentials.from_service_account_info(
+                service_account_info
+            )
+            return storage.Client(credentials=credentials, project=self.config.get_project_id())
+        except Exception as e:
+            raise Exception(f"初始化 Google Cloud Storage 服務失敗: {str(e)}")
     
     def _download_file_from_drive(self, file_id: str, file_name: str) -> str:
         """
@@ -110,41 +125,48 @@ class WebsiteAutomationCloud:
         except Exception as e:
             raise Exception(f"下載檔案失敗 {file_name}: {str(e)}")
     
-    def _upload_screenshot_to_drive(self, screenshot_path: str, screenshot_name: str) -> str:
+    def _upload_screenshot_to_gcs(self, screenshot_path: str, screenshot_name: str) -> str:
         """
-        上傳截圖到 Google Drive
+        上傳截圖到 Google Cloud Storage
         
         Args:
             screenshot_path (str): 本地截圖路徑
             screenshot_name (str): 截圖檔名
             
         Returns:
-            str: Google Drive 檔案 URL
+            str: GCS 檔案 URL
         """
         try:
-            print(f"📤 上傳截圖：{screenshot_name}")
+            print(f"📤 上傳截圖到 GCS：{screenshot_name}")
+            
+            # 取得 bucket
+            bucket_name = self.config.WEBSITE_AUTOMATION['SCREENSHOT_BUCKET']
+            bucket = self.gcs_client.bucket(bucket_name)
+            
+            # 建立 blob（檔案路徑：screenshots/檔名）
+            blob_path = f"screenshots/{screenshot_name}"
+            blob = bucket.blob(blob_path)
             
             # 上傳檔案
-            media = MediaFileUpload(screenshot_path, mimetype='image/png')
-            file_metadata = {
-                'name': screenshot_name,
-                'parents': [self.config.WEBSITE_AUTOMATION['SCREENSHOT_FOLDER_ID']]
-            }
+            blob.upload_from_filename(screenshot_path, content_type='image/png')
             
-            file = self.drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
-            ).execute()
+            # 生成公開 URL（如果需要可以改成 signed URL）
+            # 方案1：公開 URL（需要 bucket 設定為 public）
+            # file_url = blob.public_url
             
-            file_id = file.get('id')
-            file_url = f"https://drive.google.com/file/d/{file_id}/view"
+            # 方案2：GCS 瀏覽器 URL（需要登入才能看）
+            file_url = f"https://console.cloud.google.com/storage/browser/_details/{bucket_name}/{blob_path}"
+            
+            # 方案3：Signed URL（臨時連結，7天有效）
+            # from datetime import timedelta
+            # file_url = blob.generate_signed_url(expiration=timedelta(days=7))
             
             print(f"✅ 截圖上傳完成：{screenshot_name}")
+            print(f"🔗 GCS URL: gs://{bucket_name}/{blob_path}")
             return file_url
             
         except Exception as e:
-            raise Exception(f"上傳截圖失敗 {screenshot_name}: {str(e)}")
+            raise Exception(f"上傳截圖到 GCS 失敗 {screenshot_name}: {str(e)}")
     
     def _generate_timestamp(self) -> str:
         """生成台灣時區的時間戳記"""
@@ -404,20 +426,20 @@ class WebsiteAutomationCloud:
     
     def take_screenshot_and_upload(self, screenshot_type: str = "填寫完成") -> str:
         """
-        截圖並上傳到 Google Drive
+        截圖並上傳到 Google Cloud Storage
         
         Args:
             screenshot_type (str): 截圖類型（填寫完成、提交成功、失敗）
             
         Returns:
-            str: Google Drive 截圖檔案 URL
+            str: GCS 截圖檔案 URL
         """
         try:
             print(f"📸 截圖：{screenshot_type}")
             
             # 生成截圖檔名
             timestamp = self._generate_timestamp()
-            screenshot_name = f"申請截圖_2025年10月_{timestamp}_{screenshot_type}.png"
+            screenshot_name = f"申請截圖_2025年11月_{timestamp}_{screenshot_type}.png"
             screenshot_path = os.path.join(self.temp_dir, screenshot_name)
             
             # 截圖
@@ -427,11 +449,11 @@ class WebsiteAutomationCloud:
                 type='png'
             )
             
-            # 上傳到 Google Drive
-            drive_url = self._upload_screenshot_to_drive(screenshot_path, screenshot_name)
+            # 上傳到 Google Cloud Storage
+            gcs_url = self._upload_screenshot_to_gcs(screenshot_path, screenshot_name)
             
-            print(f"✅ 截圖完成並上傳到 Google Drive")
-            return drive_url
+            print(f"✅ 截圖完成並上傳到 GCS")
+            return gcs_url
             
         except Exception as e:
             raise Exception(f"截圖失敗: {str(e)}")

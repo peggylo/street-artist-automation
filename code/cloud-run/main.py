@@ -643,10 +643,10 @@ def website_automation():
         logger.info(f"開始網站自動化處理: 用戶 {user_id}")
         
         # 導入並執行網站自動化
-        from website_automation_cloud import WebsiteAutomation
+        from website_automation_cloud import WebsiteAutomationCloud
         
-        # 建立自動化實例（Cloud Run 使用 headless 模式）
-        automation = WebsiteAutomation(headless=True)
+        # 建立自動化實例（階段 2B：Cloud Run 測試，不提交）
+        automation = WebsiteAutomationCloud(stage="2B")
         
         # 執行網站自動化
         result = automation.run_automation(application_data)
