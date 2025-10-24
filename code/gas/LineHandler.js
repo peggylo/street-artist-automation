@@ -243,6 +243,114 @@ function createQuickReply(options) {
 }
 
 /**
+ * Phase 6: 發送圖片訊息給指定用戶或群組
+ * @param {string} to - 用戶 ID 或群組 ID
+ * @param {string} imageUrl - 圖片的公開 URL（或 Signed URL）
+ * @param {string} previewImageUrl - 預覽圖片 URL（可選，預設與 imageUrl 相同）
+ * @return {boolean} 是否發送成功
+ */
+function pushImageMessage(to, imageUrl, previewImageUrl = null) {
+  try {
+    console.log('📤 準備發送圖片訊息給:', to);
+    console.log('🖼️ 圖片 URL:', imageUrl);
+    
+    const lineConfig = getLineConfig();
+    const url = 'https://api.line.me/v2/bot/message/push';
+    
+    // 如果沒有提供預覽圖片，使用原始圖片
+    const preview = previewImageUrl || imageUrl;
+    
+    const payload = {
+      to: to,
+      messages: [{
+        type: 'image',
+        originalContentUrl: imageUrl,
+        previewImageUrl: preview
+      }]
+    };
+    
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + lineConfig.ACCESS_TOKEN
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    console.log('🚀 發送 LINE Image Push API 請求...');
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    console.log('📨 LINE Image Push API 回應:', {
+      code: responseCode,
+      response: responseText
+    });
+    
+    if (responseCode === 200) {
+      console.log('✅ 圖片訊息發送成功');
+      return true;
+    } else {
+      console.error('❌ 圖片訊息發送失敗:', responseCode, responseText);
+      return false;
+    }
+    
+  } catch (error) {
+    console.error('❌ 發送圖片訊息錯誤:', error);
+    console.error('📋 錯誤詳情:', error.stack);
+    return false;
+  }
+}
+
+/**
+ * Phase 6: 下載 Signed URL 的圖片並發送到 LINE
+ * @param {string} to - 用戶 ID 或群組 ID
+ * @param {string} signedUrl - GCS Signed URL
+ * @return {boolean} 是否發送成功
+ */
+function downloadAndPushImage(to, signedUrl) {
+  try {
+    console.log('📥 從 Signed URL 下載圖片:', signedUrl);
+    
+    // 從 Signed URL 下載圖片
+    const imageResponse = UrlFetchApp.fetch(signedUrl, {
+      muteHttpExceptions: true
+    });
+    
+    const responseCode = imageResponse.getResponseCode();
+    if (responseCode !== 200) {
+      console.error('❌ 下載圖片失敗:', responseCode);
+      return false;
+    }
+    
+    const imageBlob = imageResponse.getBlob();
+    console.log('✅ 圖片下載成功，大小:', imageBlob.getBytes().length, 'bytes');
+    
+    // 將圖片上傳到 Google Drive（臨時存放，供 LINE 下載）
+    const driveFile = DriveApp.createFile(imageBlob);
+    driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    const driveUrl = 'https://drive.google.com/uc?export=view&id=' + driveFile.getId();
+    console.log('📤 圖片已上傳到 Google Drive:', driveUrl);
+    
+    // 發送圖片訊息到 LINE
+    const success = pushImageMessage(to, driveUrl);
+    
+    // 清理：發送成功後可選擇刪除臨時檔案（或保留供日後查看）
+    // driveFile.setTrashed(true);
+    
+    return success;
+    
+  } catch (error) {
+    console.error('❌ 下載並發送圖片錯誤:', error);
+    console.error('📋 錯誤詳情:', error.stack);
+    return false;
+  }
+}
+
+/**
  * 測試 LINE API 連線
  */
 function testLineAPI() {

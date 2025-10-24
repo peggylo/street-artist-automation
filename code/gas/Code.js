@@ -4,31 +4,48 @@
  */
 
 /**
- * LINE Webhook 處理器 - 接收來自 LINE 的訊息
+ * LINE Webhook 處理器 - 接收來自 LINE 的訊息 或 Cloud Run 回調
  */
 function doPost(e) {
   try {
-    console.log('🔔 收到 LINE Webhook 請求');
+    console.log('🔔 收到 POST 請求');
     
-    // 解析 LINE 的訊息資料
+    // 解析請求資料
     const data = JSON.parse(e.postData.contents);
     console.log('📨 原始資料:', JSON.stringify(data, null, 2));
     
-    // 處理 LINE 事件
+    // Phase 6: 判斷是 LINE Webhook 還是 Cloud Run 回調
     if (data.events && data.events.length > 0) {
+      // LINE Webhook - 處理 LINE 事件
+      console.log('📱 LINE Webhook 事件');
       data.events.forEach(event => {
         handleLineEvent(event);
       });
+      
+      // 回傳 200 狀態碼給 LINE
+      return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+      
+    } else if (data.user_id && data.timestamp) {
+      // Cloud Run 回調 - 處理網站自動化結果
+      console.log('🌐 Cloud Run 回調');
+      handleCloudRunCallback(data);
+      
+      // 回傳 200 狀態碼給 Cloud Run
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: 'Callback received'
+      })).setMimeType(ContentService.MimeType.JSON);
+      
+    } else {
+      console.warn('⚠️ 未知的 POST 請求格式');
+      return ContentService.createTextOutput('UNKNOWN').setMimeType(ContentService.MimeType.TEXT);
     }
     
-    // 回傳 200 狀態碼給 LINE
-    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
-    
   } catch (error) {
-    console.error('❌ Webhook 處理錯誤:', error);
+    console.error('❌ POST 請求處理錯誤:', error);
     console.error('📋 錯誤詳情:', error.stack);
     
-    // 即使發生錯誤也要回傳 200 給 LINE
+    // 即使發生錯誤也要回傳 200
     return ContentService.createTextOutput('ERROR').setMimeType(ContentService.MimeType.TEXT);
   }
 }
@@ -149,14 +166,23 @@ function handleTextMessage(event, text) {
   
   console.log('📝 處理文字訊息:', text);
   
+  // 🔍 DEBUG: 驗證配置載入
+  console.log('🔍 DEBUG - CONFIG 物件:', typeof CONFIG);
+  console.log('🔍 DEBUG - PHASE3:', JSON.stringify(CONFIG.PHASE3, null, 2));
+  console.log('🔍 DEBUG - ENABLE_STATE_MANAGEMENT:', CONFIG.PHASE3.ENABLE_STATE_MANAGEMENT);
+  console.log('🔍 DEBUG - ENABLE_OPENAI:', CONFIG.PHASE2.ENABLE_OPENAI);
+  
   // Phase 3: 狀態管理和業務邏輯
   if (CONFIG.PHASE3.ENABLE_STATE_MANAGEMENT) {
+    console.log('✅ 進入 Phase 3 狀態管理流程');
     handleTextMessageWithState(event, text);
   }
   // Phase 2: 使用 OpenAI 語意解析
   else if (CONFIG.PHASE2.ENABLE_OPENAI) {
+    console.log('⚠️ 進入 Phase 2 AI 流程');
     handleTextMessageWithAI(event, text);
   } else {
+    console.log('⚠️ 進入 Phase 1 基本流程');
     // Phase 1: 簡單的回應機制（保留作為備案）
     handleTextMessageBasic(event, text);
   }
@@ -237,6 +263,13 @@ function handleHighConfidenceIntent(analysis, userId, originalText) {
  */
 function handleApplicationIntent(userId) {
   console.log('🎭 開始申請流程');
+  
+  // 清除舊狀態（重新開始申請）
+  const oldState = getUserState(userId);
+  if (oldState) {
+    console.log('🗑️ 清除舊狀態，重新開始申請');
+    clearUserState(userId);
+  }
   
   // 檢查申請時間窗口
   const windowCheck = checkApplicationWindow();
@@ -338,7 +371,7 @@ function handleTextMessageBasic(event, text) {
 /**
  * 處理基於狀態的輸入
  */
-function handleStateBasedInput(userState, text, userId) {
+function handleStateBasedInput(userState, text, userId, event) {
   const normalizedText = text.trim().toLowerCase();
   console.log('🎯 狀態處理:', userState.currentStep, normalizedText);
   
@@ -428,8 +461,15 @@ function handleStateBasedInput(userState, text, userId) {
     
     case 'final_confirmation':
       // 最終確認狀態
+      console.log('📋 處理最終確認狀態，輸入:', normalizedText);
       if (['對', '好', '確定', '確認', '可以', 'ok'].includes(normalizedText)) {
-        return executeFinalApplication(userId);
+        console.log('✅ 用戶確認，開始執行最終申請');
+        // Phase 6: 取得 groupId（如果有）
+        const groupId = event.source && event.source.type === 'group' ? event.source.groupId : null;
+        console.log('📋 groupId:', groupId);
+        const result = executeFinalApplication(userId, groupId);
+        console.log('📤 executeFinalApplication 返回結果長度:', result ? result.length : 'null');
+        return result;
       } else if (normalizedText.includes('改日期')) {
         return startDateModification(userId);
       } else if (normalizedText.includes('改影片')) {
@@ -494,16 +534,28 @@ function confirmApplication(userId) {
 }
 
 /**
- * 執行最終申請（Phase 4 版本 - 含 Sheets 記錄）
+ * Phase 5-6: 執行最終申請（含 Sheets 記錄 + 文件處理 + 網站自動化）
+ * @param {string} userId - 用戶 ID
+ * @param {string} groupId - 群組 ID（可選）
  */
-function executeFinalApplication(userId) {
+function executeFinalApplication(userId, groupId = null) {
+  console.log('🚀 開始執行最終申請');
+  console.log('📋 userId:', userId);
+  console.log('📋 groupId:', groupId);
+  
   const state = getUserState(userId);
+  console.log('📊 用戶狀態:', JSON.stringify(state, null, 2));
+  
   if (!state) {
+    console.error('❌ 找不到用戶狀態');
     return '請先說「申請」開始申請流程';
   }
   
   const dateDisplay = state.selectedDates.map(d => d.display).join('、');
   const videoDisplay = state.useDefaultVideo ? '常用影片' : '新上傳影片';
+  
+  console.log('📅 日期顯示:', dateDisplay);
+  console.log('🎬 影片顯示:', videoDisplay);
   
   try {
     // Phase 4: 記錄申請資訊到 Google Sheets
@@ -519,10 +571,10 @@ function executeFinalApplication(userId) {
       }
     }
     
-    // Phase 5: 自動呼叫 Cloud Run 處理文件（方案 B：GAS 複製 + Cloud Run 編輯）
+    // Phase 5-6: 自動呼叫 Cloud Run 處理文件 + 網站自動化
     let documentProcessingMessage = '';
-    if (CONFIG.PHASE5.ENABLE_DOCUMENT_PROCESSING) {
-      console.log('🚀 Phase 5: 自動呼叫 Cloud Run 處理文件（方案 B）');
+    if (CONFIG.PHASE6.ENABLE_WEBSITE_AUTOMATION) {
+      console.log('🚀 Phase 5-6: 自動呼叫 Cloud Run 處理文件和網站自動化');
       
       if (!applicationData) {
         applicationData = prepareApplicationData(state);
@@ -534,10 +586,10 @@ function executeFinalApplication(userId) {
       if (copyResult.success) {
         console.log('✅ 模板複製成功，開始呼叫 Cloud Run');
         
-        // 步驟 2: 呼叫 Cloud Run，傳送複製檔案的 ID 和時間戳記
+        // 步驟 2: 呼叫 Cloud Run，傳送複製檔案的 ID、時間戳記和群組 ID
         const cloudRunData = {
-          timestamp: applicationData.timestamp,  // 新增：用於精確識別記錄
-          user_id: userId,                       // 保留：向後相容
+          timestamp: applicationData.timestamp,  // 用於精確識別記錄
+          user_id: userId,                       // 用戶 ID
           application_data: {
             ...applicationData,
             copiedFileId: copyResult.copiedFileId,
@@ -547,16 +599,17 @@ function executeFinalApplication(userId) {
           }
         };
         
-        const cloudRunResult = callCloudRunForDocumentProcessing(userId, cloudRunData);
+        // Phase 6: 傳入 groupId
+        const cloudRunResult = callCloudRunForDocumentProcessing(userId, cloudRunData, groupId);
         
         if (cloudRunResult.success) {
-          documentProcessingMessage = '\n🔄 文件處理已啟動，系統正在生成 PDF\n📄 Word 檔案：' + copyResult.wordFileName + '\n📄 PDF 檔案：' + copyResult.pdfFileName;
+          documentProcessingMessage = '\n🔄 文件處理和網站自動化已啟動\n📄 Word 檔案：' + copyResult.wordFileName + '\n📄 PDF 檔案：' + copyResult.pdfFileName + '\n🌐 系統將自動填寫表單，完成後會發送截圖';
         } else {
-          documentProcessingMessage = '\n⚠️ 文件處理啟動失敗，但檔案已準備\n📄 Word：' + copyResult.wordFileName + '\n📄 PDF：' + copyResult.pdfFileName;
+          documentProcessingMessage = '\n⚠️ 自動化啟動失敗，但檔案已準備\n📄 Word：' + copyResult.wordFileName + '\n📄 PDF：' + copyResult.pdfFileName;
           console.error('❌ Cloud Run 呼叫失敗:', cloudRunResult.error);
         }
       } else {
-        documentProcessingMessage = '\n❌ 模板複製失敗，無法啟動文件處理\n🔧 ' + copyResult.message;
+        documentProcessingMessage = '\n❌ 模板複製失敗，無法啟動自動化\n🔧 ' + copyResult.message;
         console.error('❌ 模板複製失敗:', copyResult.message);
       }
     }
@@ -571,9 +624,9 @@ function executeFinalApplication(userId) {
 🎬 表演影片：${videoDisplay}
 
 📊 申請資訊已記錄到系統${documentProcessingMessage}
-🔔 處理完成後會更新狀態
 
-🎉 Phase 5 自動化流程已啟動！`;
+🎉 Phase 6 完整自動化流程已啟動！
+⏳ 請稍候，系統處理完成後會通知您`;
     
   } catch (error) {
     console.error('❌ 申請記錄過程發生錯誤:', error);
@@ -1243,7 +1296,7 @@ function handleTextMessageWithState(event, text) {
     
     // 第一層：根據狀態處理（知道上下文）
     if (userState && userState.currentStep) {
-      const stateResponse = handleStateBasedInput(userState, text, userId);
+      const stateResponse = handleStateBasedInput(userState, text, userId, event);
       if (stateResponse) {
         replyMessage(replyToken, stateResponse);
         return;
@@ -1284,7 +1337,17 @@ function handleTextMessageWithState(event, text) {
     
   } catch (error) {
     console.error('❌ Phase 3 處理失敗:', error);
-    handleTextMessageWithAI(event, text); // 降級到 Phase 2
+    console.error('📋 錯誤詳情:', error.stack);
+    console.error('📋 錯誤名稱:', error.name);
+    console.error('📋 錯誤訊息:', error.message);
+    
+    // 通知用戶發生錯誤
+    replyMessage(replyToken, `⚠️ Phase 3 系統異常，已自動切換到備用模式
+    
+🔧 錯誤類型：${error.name}
+📝 錯誤訊息：${error.message}
+
+請截圖此訊息並聯繫管理員`);
   }
 }
 
@@ -1400,6 +1463,7 @@ function formatDatesForSheet(selectedDates) {
       const day = dateParts[2];
       
       // 處理 fullDate 可能是字串的情況（Cache Service 序列化問題）
+      // 因為 Google Apps Script 的 Cache Service 會把 Date 物件轉成字串，所以需要特別處理
       let year;
       try {
         if (date.fullDate) {
@@ -1520,25 +1584,30 @@ function testSheetsRecording() {
 // =====================================================
 
 /**
- * 呼叫 Cloud Run 進行文件處理
+ * Phase 5-6: 呼叫 Cloud Run 進行文件處理 + 網站自動化
  * @param {string} userId - 用戶ID
  * @param {Object} cloudRunData - 完整的 Cloud Run 請求資料
+ * @param {string} groupId - 群組ID（用於回調通知）
  * @return {Object} 處理結果 {success: boolean, message: string, error?: string}
  */
-function callCloudRunForDocumentProcessing(userId, cloudRunData) {
+function callCloudRunForDocumentProcessing(userId, cloudRunData, groupId = null) {
   try {
-    console.log('🚀 Phase 5: 呼叫 Cloud Run 處理文件');
+    console.log('🚀 Phase 5-6: 呼叫 Cloud Run 處理文件和網站自動化');
     
-    const config = CONFIG.PHASE5.CLOUD_RUN;
+    const config = CONFIG.PHASE6.CLOUD_RUN;
     const url = config.SERVICE_URL + config.PROCESS_ENDPOINT;
     
-    // 直接使用已準備好的 cloudRunData（格式已經正確）
-    const requestData = cloudRunData;
+    // Phase 6: 加入 GAS 回調 URL 和群組 ID
+    const requestData = {
+      ...cloudRunData,
+      gas_callback_url: CONFIG.PHASE6.GAS_CALLBACK_URL,
+      group_id: groupId  // 傳送群組 ID 供回調時使用
+    };
     
     console.log('📤 發送請求到 Cloud Run:', url);
     console.log('📋 請求資料:', JSON.stringify(requestData, null, 2));
     
-    // 發送 HTTP 請求
+    // 發送 HTTP 請求（Phase 6: 增加超時時間支援網站自動化）
     const options = {
       method: 'POST',
       headers: {
@@ -1561,14 +1630,14 @@ function callCloudRunForDocumentProcessing(userId, cloudRunData) {
         console.log('✅ Cloud Run 呼叫成功');
         return {
           success: true,
-          message: '文件處理已啟動',
+          message: '文件處理和網站自動化已啟動',
           result: result
         };
       } catch (parseError) {
         console.error('❌ 解析 Cloud Run 回應失敗:', parseError);
         return {
           success: false,
-          message: '文件處理服務回應格式錯誤',
+          message: '服務回應格式錯誤',
           error: parseError.message
         };
       }
@@ -1576,7 +1645,7 @@ function callCloudRunForDocumentProcessing(userId, cloudRunData) {
       console.error('❌ Cloud Run 呼叫失敗:', responseCode, responseText);
       return {
         success: false,
-        message: `文件處理服務暫時無法使用 (${responseCode})`,
+        message: `服務暫時無法使用 (${responseCode})`,
         error: responseText
       };
     }
@@ -1585,9 +1654,84 @@ function callCloudRunForDocumentProcessing(userId, cloudRunData) {
     console.error('❌ 呼叫 Cloud Run 時發生錯誤:', error);
     return {
       success: false,
-      message: '文件處理服務連線失敗',
+      message: '服務連線失敗',
       error: error.message
     };
+  }
+}
+
+/**
+ * Phase 6: 處理來自 Cloud Run 的回調
+ * @param {Object} callbackData - Cloud Run 回傳的資料
+ */
+function handleCloudRunCallback(callbackData) {
+  try {
+    console.log('🌐 Phase 6: 處理 Cloud Run 回調');
+    console.log('📋 回調資料:', JSON.stringify(callbackData, null, 2));
+    
+    const success = callbackData.success;
+    const userId = callbackData.user_id;
+    const groupId = callbackData.group_id;  // 群組 ID
+    const timestamp = callbackData.timestamp;
+    const message = callbackData.message;
+    
+    // 決定發送對象（優先使用群組，否則使用用戶）
+    const targetId = groupId || userId;
+    
+    if (success) {
+      // ===== 成功：發送文字訊息 + 截圖 =====
+      console.log('✅ 網站自動化成功');
+      
+      // 1. 發送文字訊息
+      pushMessage(targetId, message);
+      
+      // 2. 下載並發送截圖
+      const screenshotUrl = callbackData.screenshot_url;
+      if (screenshotUrl) {
+        console.log('📸 準備發送截圖:', screenshotUrl);
+        
+        // 使用 downloadAndPushImage 從 Signed URL 下載並發送
+        const imageSuccess = downloadAndPushImage(targetId, screenshotUrl);
+        
+        if (imageSuccess) {
+          console.log('✅ 截圖發送成功');
+        } else {
+          console.error('❌ 截圖發送失敗');
+          // 即使截圖失敗，也不影響主流程
+        }
+      } else {
+        console.warn('⚠️ 沒有截圖 URL');
+      }
+      
+    } else {
+      // ===== 失敗：發送錯誤訊息 + 失敗截圖（如果有）=====
+      console.error('❌ 網站自動化失敗');
+      
+      // 1. 發送錯誤訊息
+      pushMessage(targetId, message);
+      
+      // 2. 如果有失敗截圖，也發送
+      const failureScreenshotUrl = callbackData.failure_screenshot_url;
+      if (failureScreenshotUrl) {
+        console.log('📸 準備發送失敗截圖:', failureScreenshotUrl);
+        
+        const imageSuccess = downloadAndPushImage(targetId, failureScreenshotUrl);
+        
+        if (imageSuccess) {
+          console.log('✅ 失敗截圖發送成功');
+        } else {
+          console.error('❌ 失敗截圖發送失敗');
+        }
+      }
+    }
+    
+    console.log('🎯 Cloud Run 回調處理完成');
+    return true;
+    
+  } catch (error) {
+    console.error('❌ 處理 Cloud Run 回調時發生錯誤:', error);
+    console.error('📋 錯誤詳情:', error.stack);
+    return false;
   }
 }
 
@@ -1741,4 +1885,41 @@ function dailyKeepAlive() {
       error: error.message
     };
   }
+}
+
+/**
+ * 🔍 DEBUG: 測試配置載入狀況
+ * 用於診斷為什麼 LINE Bot 走到 Phase 2
+ */
+function debugPhaseConfig() {
+  console.log('========================================');
+  console.log('🔍 DEBUG: 配置診斷測試');
+  console.log('========================================');
+  
+  console.log('');
+  console.log('📋 CONFIG 物件類型:', typeof CONFIG);
+  
+  console.log('');
+  console.log('📋 PHASE2 設定:');
+  console.log('   ENABLE_OPENAI:', CONFIG.PHASE2.ENABLE_OPENAI);
+  
+  console.log('');
+  console.log('📋 PHASE3 設定:');
+  console.log('   ENABLE_STATE_MANAGEMENT:', CONFIG.PHASE3.ENABLE_STATE_MANAGEMENT);
+  console.log('   ENABLE_BUSINESS_LOGIC:', CONFIG.PHASE3.ENABLE_BUSINESS_LOGIC);
+  
+  console.log('');
+  console.log('📋 完整 PHASE3 設定:');
+  console.log(JSON.stringify(CONFIG.PHASE3, null, 2));
+  
+  console.log('');
+  console.log('========================================');
+  console.log('✅ 診斷測試完成');
+  console.log('========================================');
+  
+  return {
+    success: true,
+    phase2_enabled: CONFIG.PHASE2.ENABLE_OPENAI,
+    phase3_enabled: CONFIG.PHASE3.ENABLE_STATE_MANAGEMENT
+  };
 }

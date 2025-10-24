@@ -127,14 +127,14 @@ class WebsiteAutomationCloud:
     
     def _upload_screenshot_to_gcs(self, screenshot_path: str, screenshot_name: str) -> str:
         """
-        上傳截圖到 Google Cloud Storage
+        上傳截圖到 Google Cloud Storage 並生成 Signed URL
         
         Args:
             screenshot_path (str): 本地截圖路徑
             screenshot_name (str): 截圖檔名
             
         Returns:
-            str: GCS 檔案 URL
+            str: Signed URL（15分鐘有效期，供 LINE 下載）
         """
         try:
             print(f"📤 上傳截圖到 GCS：{screenshot_name}")
@@ -150,19 +150,17 @@ class WebsiteAutomationCloud:
             # 上傳檔案
             blob.upload_from_filename(screenshot_path, content_type='image/png')
             
-            # 生成公開 URL（如果需要可以改成 signed URL）
-            # 方案1：公開 URL（需要 bucket 設定為 public）
-            # file_url = blob.public_url
-            
-            # 方案2：GCS 瀏覽器 URL（需要登入才能看）
-            file_url = f"https://console.cloud.google.com/storage/browser/_details/{bucket_name}/{blob_path}"
-            
-            # 方案3：Signed URL（臨時連結，7天有效）
-            # from datetime import timedelta
-            # file_url = blob.generate_signed_url(expiration=timedelta(days=7))
+            # 生成 Signed URL（15分鐘有效期，足夠 LINE 伺服器下載）
+            from datetime import timedelta
+            file_url = blob.generate_signed_url(
+                expiration=timedelta(minutes=15),
+                method='GET',
+                version='v4'
+            )
             
             print(f"✅ 截圖上傳完成：{screenshot_name}")
             print(f"🔗 GCS URL: gs://{bucket_name}/{blob_path}")
+            print(f"🔗 Signed URL 有效期：15分鐘")
             return file_url
             
         except Exception as e:

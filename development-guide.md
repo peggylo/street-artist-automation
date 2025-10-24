@@ -741,12 +741,13 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **申請期限**：不需驗證，網站只會顯示可申請的連結
 
 **截圖功能設計**：
-- **存儲位置**：Google Drive 專用資料夾（ID 已設定在 config.py）
+- **存儲位置**：Google Cloud Storage bucket（`songshan-screenshots`）
 - **命名格式**：`申請截圖_YYYY年MM月_YYYYMMDD-HHmmss_狀態.png`
+- **傳送方式**：Signed URL（15分鐘有效期）→ GAS 轉存 Google Drive → LINE 傳送
 - **截圖時機**：
-  1. 填寫完成截圖（提交前）
-  2. 成功截圖（提交後成功頁面）
-  3. 失敗截圖（失敗點畫面）
+  1. 填寫完成截圖（提交前）- 階段 2B 當前狀態
+  2. 成功截圖（提交後成功頁面）- 階段 2C
+  3. 失敗截圖（失敗點畫面）- 階段 2C
 
 **網站表單選擇器整合**：
 - **階段1分析結果**：已將 `analyze_website.py` 的選擇器結果整合到 `website_analysis_result.json` ✅
@@ -827,43 +828,24 @@ gcloud run services update document-processor \
 - **檔案上傳處理**：先從Google Drive下載檔案到本地，再上傳到網站
 - **Secret Manager整合**：個人資料從Google Secret Manager動態載入
 
-### **階段2B：完整系統整合（含 Cloud Run 驗證）**
+### **階段2B：完整系統整合（含 Cloud Run 驗證）** ✅ **已完成**
 **執行方式**：LINE申請觸發完整流程
 **測試範圍**：端到端流程但不提交
 **整合重點**：同時驗證 Playwright 在 Cloud Run 環境和完整系統串接
 
 **檔案分離決策（方案A：完全分離）**：
-- **`website_automation_local.py`**：專門用於本地測試和除錯
-  - 保留有頭模式、本地截圖、詳細除錯資訊
-  - 街頭藝人證使用本地檔案路徑
-  - 適合階段2A的快速迭代和問題診斷
-- **`website_automation_cloud.py`**：專門用於 Cloud Run 生產環境
-  - 強制無頭模式、雲端截圖上傳、精簡日誌
-  - 所有檔案都從 Google Drive 下載
-  - 適合階段2B-2C的雲端部署和整合測試
-
-**分離策略優勢**：
-- 階段2A已完美運作，避免冒險修改
-- 本地除錯需求和雲端部署需求差異很大
-- 開發速度優先於程式碼重用
-- 後續可重構整合，但先確保功能正常
+- **`website_automation_local.py`**：本地測試（有頭模式、本地截圖）
+- **`website_automation_cloud.py`**：Cloud Run 生產環境（無頭模式、GCS 截圖、Signed URL）
 
 **成功標準**：
 - ✅ Cloud Run 能成功啟動 Playwright + Chromium（技術驗證）
 - ✅ LINE申請 → GAS處理 → Cloud Run文件+網站處理（系統整合）
 - ✅ 網站自動化功能在雲端環境正常運作
-- ✅ 截圖功能正常存入 Google Drive
-- ✅ 狀態正確更新到Google Sheets
-- ✅ LINE通知機制正常（含截圖直傳）
-- ✅ 錯誤處理和重試機制運作
+- ✅ 截圖上傳到 GCS，生成 Signed URL（15分鐘有效期）
+- ✅ 狀態正確更新到 Google Sheets
+- ✅ LINE 通知機制正常（含截圖傳送）
+- ✅ 錯誤處理和回調機制運作
 - ✅ **停在提交前，不按送出按鈕**
-
-**設計決策說明**：
-原本規劃的階段2A.5（純 Cloud Run 驗證）與階段2B（系統整合）合併，因為：
-- 階段2A本地測試已完全成功，技術風險較低
-- 主要挑戰是 Dockerfile 配置，屬於已知問題
-- 直接測試真實使用場景更有實際價值
-- 提升開發效率，避免重複測試相同功能
 
 ### **階段2C：真實提交測試**
 **執行方式**：LINE申請觸發，真實提交
@@ -907,13 +889,18 @@ M. 送出截圖連結    → 提交成功的截圖Google Drive連結
 N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 ```
 
-#### 🔄 通知機制技術實作
+#### 🔄 通知機制技術實作 ✅ **已完成**
+
+**實作決策**：
+- **整合方案**：方案A - 一次請求完成 Phase 5 + Phase 6（`/process-application` 端點）
+- **截圖傳送**：Signed URL（15分鐘有效期），LINE 伺服器快取後永久可見
+- **回調機制**：Cloud Run 完成後回調 GAS，GAS 推送截圖到 LINE
 
 **Cloud Run → GAS → LINE 流程**：
-1. Cloud Run完成處理後呼叫GAS回調端點
-2. GAS接收結果並更新Google Sheets
-3. GAS下載截圖並直接傳送到LINE群組
-4. 使用LINE Messaging API直接傳送圖片
+1. Cloud Run 完成處理後呼叫 GAS 回調端點（帶 Signed URL）
+2. GAS 接收結果，從 Signed URL 下載截圖並上傳到 Google Drive
+3. GAS 取得 Drive 公開連結後傳送到 LINE 群組
+4. 使用 LINE Messaging API 的 image 訊息類型傳送圖片
 
 **收費評估**：
 - LINE API免費額度：1000則訊息/月
@@ -948,25 +935,27 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 #### 6.1 階段開發任務
 - [x] **階段1**：建立網站結構分析工具（analyze_website.py）✅ **已完成**
 - [x] **階段2A**：實現基礎網站自動化（不提交）✅ **已完成**
-- [ ] **階段2B**：完整系統整合測試（含 Cloud Run 驗證 + LINE通知）
+- [x] **階段2B**：完整系統整合測試（含 Cloud Run 驗證 + LINE通知）✅ **已完成**
 - [ ] **階段2C**：真實提交測試和驗證
 
 #### 6.2 技術實作任務
 - [x] 實現表單自動填寫功能（固定個人資料）✅ **已完成**
 - [x] 實現雙檔案上傳（申請PDF+街頭藝人證照）✅ **已完成**
 - [x] 建立本地截圖功能（階段2A）✅ **已完成**
-- [x] 處理reCAPTCHA驗證（點擊策略）✅ **已完成**
-- [x] 實現重試機制和錯誤處理✅ **已完成**
-- [x] 動態選擇器載入機制✅ **已完成**
-- [ ] 建立Cloud Run→GAS→LINE通知機制
-- [ ] 新增Google Sheets截圖連結欄位
-- [ ] 建立Google Drive截圖上傳功能
+- [x] 處理 reCAPTCHA 驗證（點擊策略）✅ **已完成**
+- [x] 實現重試機制和錯誤處理 ✅ **已完成**
+- [x] 動態選擇器載入機制 ✅ **已完成**
+- [x] 建立 Cloud Run → GAS → LINE 通知機制 ✅ **已完成**
+- [x] 截圖上傳到 GCS 並生成 Signed URL ✅ **已完成**
+- [x] GAS 接收 Signed URL 並轉存到 Google Drive ✅ **已完成**
+- [x] LINE 圖片訊息傳送功能 ✅ **已完成**
 
 #### 6.3 整合測試任務
-- [ ] 完整申請流程串接（LINE對話→文件處理→網站提交）
-- [ ] 錯誤處理和通知機制完善（含截圖直傳）
-- [ ] 超時處理機制（各階段超時設定）
-- [ ] 人工處理流程（失敗時通知+檔案下載）
+- [x] 完整申請流程串接（LINE對話→文件處理→網站提交）✅ **已完成**
+- [x] 錯誤處理和通知機制（含截圖傳送）✅ **已完成**
+- [x] Cloud Run 回調機制（成功/失敗通知）✅ **已完成**
+- [ ] reCAPTCHA 圖片驗證處理（目前可能觸發，待優化）
+- [ ] 人工備案流程（失敗時通知+檔案連結）
 
 #### 🔧 Phase 6 重要 Debug 經驗
 
@@ -999,6 +988,32 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 - **原因**：相對路徑 `申請截圖/` 指向當前目錄而非專案根目錄
 - **解決**：使用 `../申請截圖/` 指向專案根目錄
 - **教訓**：注意工作目錄與檔案路徑的關係
+
+#### 🎯 Phase 6 階段 2B 實際產出 ✅ **已完成**
+
+**程式碼檔案**：
+- `website_automation_cloud.py` - Cloud Run 版本（無頭模式、GCS 截圖）✅
+- `website_automation_local.py` - 本地測試版本（有頭模式、本地截圖）✅
+- 修改 `main.py` - 整合 Phase 5 + Phase 6 於單一端點 ✅
+- 修改 GAS 檔案（Code.js, LineHandler.js, Config.js）- 回調處理和 LINE 通知 ✅
+
+**功能實現**：
+- 完整端到端流程：LINE 申請 → PDF 生成 → Playwright 填表 → 截圖回傳 ✅
+- Signed URL 機制：GCS 截圖 → 15分鐘有效 URL → GAS 轉存 Drive → LINE 傳送 ✅
+- 狀態管理：待處理 → 文件處理中 → 網站提交中 → 填寫完成（測試）✅
+- 錯誤處理：失敗時回調 GAS，通知 LINE 並傳送失敗截圖 ✅
+
+**測試驗證**：
+- ✅ Cloud Run Playwright 在無頭模式成功執行
+- ✅ 表單填寫、檔案上傳、條款勾選全部正常
+- ✅ 截圖上傳 GCS 並生成 Signed URL
+- ✅ LINE 成功接收並顯示截圖（圖片永久可見）
+- ✅ 狀態正確更新到 Google Sheets
+
+**當前狀態**：
+- ⏸️ 停在提交前（階段 2B）
+- ✅ 準備進入階段 2C（真實提交）
+- ⚠️ reCAPTCHA 圖片驗證待優化
 
 ---
 
@@ -1112,5 +1127,5 @@ function dailyKeepAlive() {
 
 ---
 
-**最後更新**: 2025年9月14日  
-**版本**: v6.1 - Phase 6 階段1-2A 完成，階段2A.5與2B合併
+**最後更新**: 2025年10月25日  
+**版本**: v6.2 - Phase 6 階段 2B 完成（LINE-Cloud Run-Playwright 完整整合）

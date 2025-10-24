@@ -498,16 +498,22 @@ def health_check():
 @app.route('/process-application', methods=['POST'])
 def process_application():
     """
-    處理申請文件
+    Phase 5-6 整合：處理申請文件 + 網站自動化
     
     預期的 JSON 格式：
     {
         "user_id": "用戶ID",
-        "year": "2024",
-        "month": "10", 
-        "selected_dates": ["2024/10/5", "2024/10/12", "2024/10/19"],
-        "video_url": "https://drive.google.com/...",
-        "video_source": "常用影片"
+        "timestamp": "20251012-0316",
+        "application_data": {
+            "year": "2025",
+            "month": "10",
+            "selected_dates": ["2025/10/5"],
+            "video_url": "https://drive.google.com/...",
+            "video_source": "常用影片",
+            "copiedFileId": "...",
+            "pdfFileId": "..."
+        },
+        "gas_callback_url": "GAS回調URL"  # Phase 6: 新增回調URL
     }
     """
     try:
@@ -518,6 +524,7 @@ def process_application():
         
         user_id = application_data.get("user_id")
         timestamp = application_data.get("timestamp")
+        gas_callback_url = application_data.get("gas_callback_url")
         
         # 提取申請資料
         app_data = application_data.get("application_data")
@@ -527,11 +534,20 @@ def process_application():
         # 將時間戳記加入申請資料中，供 update_sheets_status 使用
         app_data["timestamp"] = timestamp
         
-        logger.info(f"開始處理申請: 用戶 {user_id}, 時間戳記: {timestamp}")
-        logger.info(f"申請資料: {app_data}")
+        logger.info(f"🚀 Phase 5-6 整合流程開始")
+        logger.info(f"👤 用戶: {user_id}, 時間戳記: {timestamp}")
+        logger.info(f"📋 申請資料: {app_data}")
+        
+        # ===== Phase 5: 文件處理 =====
+        logger.info("📄 Phase 5: 開始文件處理...")
+        
+        # 更新 Sheets 狀態為「文件處理中」
+        doc_processor.update_sheets_status(user_id, app_data, "", "文件處理中")
         
         # 檢查是否為方案 B（GAS 複製 + Cloud Run 編輯）
         copied_file_id = app_data.get("copiedFileId")
+        pdf_url = ""
+        
         if copied_file_id:
             logger.info(f"使用方案 B: 編輯已複製檔案 {copied_file_id}")
             
@@ -555,9 +571,7 @@ def process_application():
                 
                 # 4. 上傳 PDF
                 pdf_url = doc_processor.upload_pdf(pdf_path, app_data)
-                
-                # 5. 更新 Sheets 狀態
-                doc_processor.update_sheets_status(user_id, app_data, pdf_url, "完成")
+                logger.info(f"PDF 檔案已上傳: {pdf_url}")
         else:
             logger.info("使用方案 A: 下載模板檔案")
             
@@ -581,27 +595,136 @@ def process_application():
                 
                 # 4. 上傳 PDF
                 pdf_url = doc_processor.upload_pdf(pdf_path, app_data)
+                logger.info(f"PDF 檔案已上傳: {pdf_url}")
+        
+        logger.info("✅ Phase 5: 文件處理完成")
+        
+        # ===== Phase 6: 網站自動化 =====
+        logger.info("🌐 Phase 6: 開始網站自動化...")
+        
+        # 更新 Sheets 狀態為「網站提交中」
+        doc_processor.update_sheets_status(user_id, app_data, pdf_url, "網站提交中")
+        
+        # 呼叫網站自動化（階段 2B：不提交）
+        from website_automation_cloud import WebsiteAutomationCloud
+        
+        automation = WebsiteAutomationCloud(stage="2B")
+        automation_result = automation.run_automation(app_data)
+        
+        if automation_result['success']:
+            logger.info("✅ Phase 6: 網站自動化成功")
+            
+            # 更新 Sheets 狀態為「填寫完成（測試）」
+            doc_processor.update_sheets_status(
+                user_id, 
+                app_data, 
+                pdf_url, 
+                "填寫完成（測試）",
+                ""
+            )
+            
+            # 回調 GAS（如果有提供回調 URL）
+            if gas_callback_url:
+                callback_data = {
+                    "success": True,
+                    "user_id": user_id,
+                    "timestamp": timestamp,
+                    "pdf_url": pdf_url,
+                    "screenshot_url": automation_result.get('screenshot_url'),
+                    "verification": automation_result.get('verification', {}),
+                    "message": "✅ 表單填寫完成！請確認截圖"
+                }
                 
-                # 5. 更新 Sheets 狀態
-                doc_processor.update_sheets_status(user_id, app_data, pdf_url, "完成")
-        
-        logger.info(f"申請處理完成: 用戶 {user_id}")
-        
-        return jsonify({
-            "success": True,
-            "message": "申請文件處理完成",
-            "pdf_url": pdf_url,
-            "user_id": user_id
-        })
+                try:
+                    import requests
+                    callback_response = requests.post(
+                        gas_callback_url,
+                        json=callback_data,
+                        timeout=10
+                    )
+                    logger.info(f"✅ 已回調 GAS: {callback_response.status_code}")
+                except Exception as callback_error:
+                    logger.error(f"⚠️ 回調 GAS 失敗: {str(callback_error)}")
+            
+            return jsonify({
+                "success": True,
+                "message": "申請處理和網站自動化完成",
+                "pdf_url": pdf_url,
+                "screenshot_url": automation_result.get('screenshot_url'),
+                "verification": automation_result.get('verification', {}),
+                "user_id": user_id
+            })
+            
+        else:
+            logger.error(f"❌ Phase 6: 網站自動化失敗 - {automation_result.get('error')}")
+            
+            # 更新 Sheets 狀態為「失敗」
+            error_message = f"[網站提交] {automation_result.get('error', '未知錯誤')}"
+            doc_processor.update_sheets_status(
+                user_id, 
+                app_data, 
+                pdf_url, 
+                "失敗",
+                error_message
+            )
+            
+            # 回調 GAS（失敗通知）
+            if gas_callback_url:
+                callback_data = {
+                    "success": False,
+                    "user_id": user_id,
+                    "timestamp": timestamp,
+                    "pdf_url": pdf_url,
+                    "failure_screenshot_url": automation_result.get('failure_screenshot_url'),
+                    "error": error_message,
+                    "message": f"❌ 網站自動化失敗\n⚠️ {error_message}"
+                }
+                
+                try:
+                    import requests
+                    callback_response = requests.post(
+                        gas_callback_url,
+                        json=callback_data,
+                        timeout=10
+                    )
+                    logger.info(f"✅ 已回調 GAS（失敗通知）: {callback_response.status_code}")
+                except Exception as callback_error:
+                    logger.error(f"⚠️ 回調 GAS 失敗: {str(callback_error)}")
+            
+            return jsonify({
+                "success": False,
+                "error": error_message,
+                "pdf_url": pdf_url,
+                "failure_screenshot_url": automation_result.get('failure_screenshot_url'),
+                "result": automation_result
+            }), 500
         
     except Exception as e:
-        logger.error(f"處理申請失敗: {str(e)}")
+        logger.error(f"❌ 處理申請失敗: {str(e)}")
         
         # 更新失敗狀態
         try:
             user_id = application_data.get("user_id") if application_data else "unknown"
             app_data = application_data.get("application_data", {}) if application_data else {}
-            doc_processor.update_sheets_status(user_id, app_data, "", "失敗", str(e))
+            error_message = f"[文件處理] {str(e)}"
+            doc_processor.update_sheets_status(user_id, app_data, "", "失敗", error_message)
+            
+            # 回調 GAS（失敗通知）
+            gas_callback_url = application_data.get("gas_callback_url") if application_data else None
+            if gas_callback_url:
+                callback_data = {
+                    "success": False,
+                    "user_id": user_id,
+                    "timestamp": application_data.get("timestamp", ""),
+                    "error": error_message,
+                    "message": f"❌ 文件處理失敗\n⚠️ {error_message}"
+                }
+                
+                try:
+                    import requests
+                    requests.post(gas_callback_url, json=callback_data, timeout=10)
+                except:
+                    pass
         except:
             pass  # 避免二次錯誤
         
