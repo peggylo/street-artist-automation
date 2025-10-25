@@ -328,12 +328,31 @@ function downloadAndPushImage(to, signedUrl) {
     const imageBlob = imageResponse.getBlob();
     console.log('✅ 圖片下載成功，大小:', imageBlob.getBytes().length, 'bytes');
     
-    // 將圖片上傳到 Google Drive（臨時存放，供 LINE 下載）
-    const driveFile = DriveApp.createFile(imageBlob);
+    // 解碼檔名（處理 URL 編碼）
+    let fileName = imageBlob.getName();
+    console.log('📝 原始檔名:', fileName);
+    
+    if (fileName.includes('%')) {
+      try {
+        fileName = decodeURIComponent(fileName);
+        console.log('✅ 檔名解碼成功:', fileName);
+      } catch (decodeError) {
+        console.warn('⚠️ 檔名解碼失敗，使用原始檔名:', decodeError);
+      }
+    }
+    
+    // 設定解碼後的檔名
+    imageBlob.setName(fileName);
+    
+    // 取得截圖資料夾並上傳
+    const screenshotFolderId = CONFIG.PHASE3.GOOGLE_DRIVE.SCREENSHOT_FOLDER_ID;
+    const screenshotFolder = DriveApp.getFolderById(screenshotFolderId);
+    const driveFile = screenshotFolder.createFile(imageBlob);
     driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
     const driveUrl = 'https://drive.google.com/uc?export=view&id=' + driveFile.getId();
-    console.log('📤 圖片已上傳到 Google Drive:', driveUrl);
+    console.log('📤 圖片已上傳到 Google Drive 截圖資料夾:', driveUrl);
+    console.log('📁 最終檔名:', fileName);
     
     // 發送圖片訊息到 LINE
     const success = pushImageMessage(to, driveUrl);

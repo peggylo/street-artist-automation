@@ -741,11 +741,17 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **申請期限**：不需驗證，網站只會顯示可申請的連結
 
 **截圖功能設計**：
-- **存儲位置**：Google Cloud Storage bucket（`songshan-screenshots`）
+- **存儲位置**：
+  - GCS bucket：`songshan-screenshots`（Cloud Run 上傳，暫存）
+  - Google Drive：指定資料夾 `1Ef0-1MQzuhUormRVICRF_6d_Gi-veCOM`（GAS 轉存，永久）
 - **命名格式**：`申請截圖_YYYY年MM月_YYYYMMDD-HHmmss_狀態.png`
-- **傳送方式**：Signed URL（15分鐘有效期）→ GAS 轉存 Google Drive → LINE 傳送
+  - 月份：動態從申請資料獲取（如：2025年11月）
+  - 時間戳記：截圖當下的台灣時區時間
+  - 狀態：待驗證、驗證完、待確認、已完成、失敗
+- **傳送方式**：Signed URL（15分鐘有效期）→ GAS 解碼並轉存 Google Drive → LINE 傳送
+- **檔名處理**：GAS 接收 Signed URL 時自動解碼 URL 編碼，確保中文正常顯示
 - **截圖時機**：
-  1. 填寫完成截圖（提交前）- 階段 2B 當前狀態
+  1. 填寫完成截圖（提交前）- 階段 2B 當前狀態：「待驗證」
   2. 成功截圖（提交後成功頁面）- 階段 2C
   3. 失敗截圖（失敗點畫面）- 階段 2C
 
@@ -1009,6 +1015,47 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 - ✅ 截圖上傳 GCS 並生成 Signed URL
 - ✅ LINE 成功接收並顯示截圖（圖片永久可見）
 - ✅ 狀態正確更新到 Google Sheets
+
+**截圖檔名優化**（2025年10月25日）：
+- **問題**：截圖檔名月份硬編碼、存到根目錄、顯示亂碼
+- **解決方案**：
+  1. Cloud Run 動態獲取申請月份生成檔名
+  2. GAS 解碼 URL 編碼的檔名（`decodeURIComponent`）
+  3. GAS 存到指定 Google Drive 資料夾
+- **技術實作**：
+  - `website_automation_cloud.py`：保存 `application_data`，動態讀取月份
+  - `Config.js`：新增 `SCREENSHOT_FOLDER_ID` 配置
+  - `LineHandler.js`：解碼檔名並使用 `DriveApp.getFolderById()` 上傳
+- **測試驗證**：✅ 檔名正常顯示中文、✅ 存到指定資料夾、✅ LINE 圖片顯示正常
+
+**已知問題（暫不修復）**（2025年10月25日）：
+
+**1. Google Sheets I 欄（PDF 路徑）記錄不一致**：
+- **問題**：當狀態為「填寫完成（測試）」時，I 欄位（PDF 路徑）為空白
+- **根本原因**：`main.py` 中 `update_sheets_status()` 函數的 bug
+  - 只有狀態為「完成」時才寫入 `pdf_url`
+  - 其他狀態（如「填寫完成（測試）」）時 `pdf_url` 被寫成空字串
+- **影響範圍**：階段 2B 測試模式的記錄不完整
+- **實際影響**：不影響主流程運作，PDF 檔案仍正常生成並存在 Google Drive
+- **決策**：暫不修復，待階段 2C 真實提交測試時評估是否需要調整
+- **程式碼位置**：`main.py` 第 459-470 行 `update_sheets_status()` 函數
+
+**2. Google Sheets L-N 欄（截圖連結）未實作**：
+- **問題**：規劃的 L、M、N 欄位（填寫截圖連結、送出截圖連結、失敗截圖連結）完全未實作
+- **當前實作**：
+  - ✅ 截圖存到 GCS bucket（暫存）
+  - ✅ 通過 Signed URL 傳給 GAS
+  - ✅ GAS 轉存到 Google Drive 指定資料夾
+  - ✅ 發送到 LINE 群組
+  - ❌ **未寫入到 Google Sheets**
+- **影響範圍**：無法從 Sheets 追蹤截圖連結
+- **實際影響**：不影響主流程運作，截圖可從 Google Drive 資料夾或 LINE 歷史訊息查看
+- **決策**：暫不實作，主要原因：
+  - 截圖已正常存到 Google Drive 並傳送到 LINE
+  - LINE 訊息中可直接查看截圖（永久可見）
+  - Google Drive 資料夾中有完整截圖記錄
+  - 避免增加 Sheets 記錄複雜度
+- **未來優化**：可在階段 2C 後評估是否需要實作
 
 **當前狀態**：
 - ⏸️ 停在提交前（階段 2B）

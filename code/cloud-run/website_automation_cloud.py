@@ -55,6 +55,7 @@ class WebsiteAutomationCloud:
         self.page: Optional[Page] = None
         self.temp_dir = tempfile.mkdtemp()
         self.taiwan_tz = pytz.timezone('Asia/Taipei')
+        self.application_data = None  # 保存申請資料（用於生成截圖檔名）
         
         # 載入網站分析結果
         self.analysis_result = self.config.get_website_analysis_result()
@@ -422,12 +423,12 @@ class WebsiteAutomationCloud:
         except Exception as e:
             raise Exception(f"勾選同意條款失敗: {str(e)}")
     
-    def take_screenshot_and_upload(self, screenshot_type: str = "填寫完成") -> str:
+    def take_screenshot_and_upload(self, screenshot_type: str = "待驗證") -> str:
         """
         截圖並上傳到 Google Cloud Storage
         
         Args:
-            screenshot_type (str): 截圖類型（填寫完成、提交成功、失敗）
+            screenshot_type (str): 截圖類型（待驗證、驗證完、待確認、已完成、失敗）
             
         Returns:
             str: GCS 截圖檔案 URL
@@ -435,10 +436,21 @@ class WebsiteAutomationCloud:
         try:
             print(f"📸 截圖：{screenshot_type}")
             
-            # 生成截圖檔名
+            # 動態獲取申請月份（從 application_data）
+            target_month = "2025年11月"  # 預設值
+            if self.application_data and 'target_month' in self.application_data:
+                target_month_data = self.application_data.get('target_month', {})
+                if isinstance(target_month_data, dict) and 'display' in target_month_data:
+                    target_month = target_month_data['display']
+                elif isinstance(target_month_data, str):
+                    target_month = target_month_data
+            
+            # 生成截圖檔名（使用截圖時間戳記）
             timestamp = self._generate_timestamp()
-            screenshot_name = f"申請截圖_2025年11月_{timestamp}_{screenshot_type}.png"
+            screenshot_name = f"申請截圖_{target_month}_{timestamp}_{screenshot_type}.png"
             screenshot_path = os.path.join(self.temp_dir, screenshot_name)
+            
+            print(f"📝 截圖檔名：{screenshot_name}")
             
             # 截圖
             self.page.screenshot(
@@ -551,6 +563,9 @@ class WebsiteAutomationCloud:
         Returns:
             Dict: 執行結果
         """
+        # 保存申請資料（用於生成截圖檔名）
+        self.application_data = application_data
+        
         result = {
             'success': False,
             'stage': self.stage,
@@ -588,8 +603,8 @@ class WebsiteAutomationCloud:
             verification = self.verify_form_completion()
             result['verification'] = verification
             
-            # 8. 截圖（填寫完成）
-            screenshot_url = self.take_screenshot_and_upload("填寫完成")
+            # 8. 截圖（待驗證）
+            screenshot_url = self.take_screenshot_and_upload("待驗證")
             result['screenshot_url'] = screenshot_url
             
             # 9. 提交申請（僅階段2C）
