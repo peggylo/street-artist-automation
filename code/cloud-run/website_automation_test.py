@@ -117,7 +117,7 @@ def run_recaptcha_trigger_test():
             # T4: 圖片網格特寫
             print("\n📸 T4: 圖片網格特寫...")
             solver.take_element_screenshot(
-                ".rc-imageselect-table",
+                ".rc-imageselect-target",
                 "4_grid_close_up.png",
                 "T4: 圖片網格特寫"
             )
