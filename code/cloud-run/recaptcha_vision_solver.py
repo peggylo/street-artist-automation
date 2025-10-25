@@ -25,11 +25,14 @@ Common patterns:
 - "Select all images with [object]"
 - "Select all squares with [object]"
 - "Click on all images containing [object]"
+- Multi-line text may include: "If there are none, click skip"
 
-Extract only the object name (e.g., "bicycles", "traffic lights", "buses", "crosswalks").
+Extract only the object name (e.g., "bicycles", "traffic lights", "buses", "motorcycles", "crosswalks").
 
-If the object is plural, keep it plural.
-If there are multiple words (e.g., "traffic lights"), keep them together.
+Rules:
+- If the object is plural, keep it plural
+- If there are multiple words (e.g., "traffic lights"), keep them together
+- Ignore additional instructions like "If there are none, click skip"
 
 Response format (JSON only):
 {{
@@ -37,9 +40,12 @@ Response format (JSON only):
     "confidence": 0.0-1.0
 }}
 
-Example:
+Examples:
 Input: "Select all images with bicycles"
 Output: {{"target_object": "bicycles", "confidence": 1.0}}
+
+Input: "Select all squares with\\nmotorcycles\\nIf there are none, click skip"
+Output: {{"target_object": "motorcycles", "confidence": 1.0}}
 
 Input: "Click verify once there are none left"
 Output: {{"target_object": "unknown", "confidence": 0.0}}
@@ -65,43 +71,53 @@ IMPORTANT - Two possible scenarios:
 Scenario A: Multiple separate objects
 - Each tile contains a complete or partial view of a different {target_object}
 - Example: Multiple bicycles, each in different tiles
+- Example: Multiple motorcycles scattered across tiles
 
 Scenario B: One large object spanning multiple tiles
 - A single large {target_object} is split across multiple adjacent tiles
-- Example: One large bicycle spread across tiles 1,2,4,5
+- Example: One large bus spread across tiles 1,2,3,4,5,6
+
+Scenario C: No target objects present
+- If NO tiles contain the target object, return empty array []
+- Be certain before returning empty - check all tiles carefully
 
 Instructions:
 1. Carefully examine ALL 9 tiles in the grid
 2. Identify tiles containing ANY part of the target object
 3. Include tiles with:
-   ✓ Complete objects
-   ✓ Partial views (even small parts count)
+   ✓ Complete objects (entire {target_object} visible)
+   ✓ Partial views (even small parts count, e.g., wheel of a bicycle)
    ✓ Parts of larger objects spanning multiple tiles
 4. Exclude tiles with:
-   ✗ Similar but different objects (e.g., motorcycles when looking for bicycles)
-   ✗ Completely unrelated content
+   ✗ Similar but different objects (e.g., bicycles when looking for motorcycles, cars when looking for buses)
+   ✗ Completely unrelated content (e.g., trees, buildings, roads without target)
+   ✗ Background elements (sky, ground, walls)
 
 Pay special attention to:
 - Objects that span multiple tiles (consider all tiles they occupy)
-- Partial views at tile edges
+- Partial views at tile edges (even small visible parts count)
+- Distinguish similar vehicles: bicycles ≠ motorcycles, cars ≠ buses
 - Small or unclear portions that are still part of the target object
-- Each tile may contain part of an object or no object at all
 
 Response format (JSON only):
 {{
-    "selected_cells": [list of tile numbers containing {target_object}],
+    "selected_cells": [list of tile numbers containing {target_object}, or empty [] if none],
     "confidence": 0.0-1.0 (how confident you are),
     "explanation": "Brief reasoning",
-    "pattern": "separate_objects" or "spanning_object"
+    "pattern": "separate_objects" or "spanning_object" or "none_found"
 }}
 
 Example 1 (Separate objects):
-If tiles 1, 3, 5, 7 each contain a different bicycle:
-{{"selected_cells": [1, 3, 5, 7], "confidence": 0.95, "explanation": "4 separate bicycles clearly visible", "pattern": "separate_objects"}}
+If tiles 1, 3, 5, 7 each contain a different motorcycle:
+{{"selected_cells": [1, 3, 5, 7], "confidence": 0.95, "explanation": "4 separate motorcycles clearly visible", "pattern": "separate_objects"}}
 
 Example 2 (Spanning object):
-If one large bicycle spans tiles 1, 2, 4, 5:
-{{"selected_cells": [1, 2, 4, 5], "confidence": 0.92, "explanation": "One large bicycle spanning adjacent tiles", "pattern": "spanning_object"}}
+If one large bus spans tiles 1, 2, 4, 5, 7, 8:
+{{"selected_cells": [1, 2, 4, 5, 7, 8], "confidence": 0.92, "explanation": "One large bus spanning multiple adjacent tiles", "pattern": "spanning_object"}}
+
+Example 3 (No objects):
+If no buses are present (only cars, roads, buildings):
+{{"selected_cells": [], "confidence": 0.88, "explanation": "No buses found, only cars and roads visible", "pattern": "none_found"}}
 """
     
     # 錯誤訊息格式

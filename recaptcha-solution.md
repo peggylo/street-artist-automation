@@ -115,48 +115,9 @@ code/cloud-run/
 
 **目的**：從 "Select all images with bicycles" 提取 "bicycles"
 
-**提示文字元素探測邏輯**（多選擇器嘗試）：
-```python
-# 按優先順序嘗試以下選擇器，直到找到為止
-CHALLENGE_TEXT_SELECTORS = [
-    '.rc-imageselect-desc-no-canonical',  # 最常見
-    '.rc-imageselect-desc',               # 備選1
-    '.rc-imageselect-instructions',       # 備選2
-    '.rc-imageselect-desc-wrapper'        # 備選3
-]
-```
-
-**GPT-4.1 Text 解析 Prompt**：
-```python
-extract_prompt = f"""
-Extract the target object name from this reCAPTCHA challenge instruction.
-
-Instruction text: "{challenge_text}"
-
-Common patterns:
-- "Select all images with [object]"
-- "Select all squares with [object]"
-- "Click on all images containing [object]"
-
-Extract only the object name (e.g., "bicycles", "traffic lights", "buses", "crosswalks").
-
-If the object is plural, keep it plural.
-If there are multiple words (e.g., "traffic lights"), keep them together.
-
-Response format (JSON only):
-{{
-    "target_object": "extracted object name",
-    "confidence": 0.0-1.0
-}}
-
-Example:
-Input: "Select all images with bicycles"
-Output: {{"target_object": "bicycles", "confidence": 1.0}}
-
-Input: "Click verify once there are none left"
-Output: {{"target_object": "unknown", "confidence": 0.0}}
-"""
-```
+**Prompt 實作位置**：
+- 提示文字解析 Prompt：`recaptcha_vision_solver.py` 中的 `EXTRACT_PROMPT_TEMPLATE`
+- 提示文字選擇器：`config.py` 中的 `RECAPTCHA_VISION["CHALLENGE_TEXT_SELECTORS"]`
 
 **成本**：約 100 tokens input + 20 tokens output = $0.0002（可忽略）
 
@@ -164,81 +125,10 @@ Output: {{"target_object": "unknown", "confidence": 0.0}}
 
 #### B. 圖片識別 Prompt（主要 Vision API）
 
-**Grid Layout 視覺化**（ASCII Art）：
-```
-┌─────┬─────┬─────┐
-│  1  │  2  │  3  │
-├─────┼─────┼─────┤
-│  4  │  5  │  6  │  (Numbered left to right, top to bottom)
-├─────┼─────┼─────┤
-│  7  │  8  │  9  │
-└─────┴─────┴─────┘
-```
-
-**完整 Vision Prompt**：
-```python
-vision_prompt = f"""
-You are a reCAPTCHA image verification expert.
-
-Task: Analyze this 3x3 grid image (9 tiles total) and identify which tiles contain "{target_object}".
-
-Grid Layout:
-┌─────┬─────┬─────┐
-│  1  │  2  │  3  │
-├─────┼─────┼─────┤
-│  4  │  5  │  6  │  (Numbered left to right, top to bottom)
-├─────┼─────┼─────┤
-│  7  │  8  │  9  │
-└─────┴─────┴─────┘
-
-IMPORTANT - Two possible scenarios:
-
-Scenario A: Multiple separate objects
-- Each tile contains a complete or partial view of a different {target_object}
-- Example: Multiple bicycles, each in different tiles
-
-Scenario B: One large object spanning multiple tiles
-- A single large {target_object} is split across multiple adjacent tiles
-- Example: One large bicycle spread across tiles 1,2,4,5
-
-Instructions:
-1. Carefully examine ALL 9 tiles in the grid
-2. Identify tiles containing ANY part of the target object
-3. Include tiles with:
-   ✓ Complete objects
-   ✓ Partial views (even small parts count)
-   ✓ Parts of larger objects spanning multiple tiles
-4. Exclude tiles with:
-   ✗ Similar but different objects (e.g., motorcycles when looking for bicycles)
-   ✗ Completely unrelated content
-
-Pay special attention to:
-- Objects that span multiple tiles (consider all tiles they occupy)
-- Partial views at tile edges
-- Small or unclear portions that are still part of the target object
-- Each tile may contain part of an object or no object at all
-
-Response format (JSON only):
-{{
-    "selected_cells": [list of tile numbers containing {target_object}],
-    "confidence": 0.0-1.0 (how confident you are),
-    "explanation": "Brief reasoning",
-    "pattern": "separate_objects" or "spanning_object"
-}}
-
-Example 1 (Separate objects):
-If tiles 1, 3, 5, 7 each contain a different bicycle:
-{{"selected_cells": [1, 3, 5, 7], "confidence": 0.95, "explanation": "4 separate bicycles clearly visible", "pattern": "separate_objects"}}
-
-Example 2 (Spanning object):
-If one large bicycle spans tiles 1, 2, 4, 5:
-{{"selected_cells": [1, 2, 4, 5], "confidence": 0.92, "explanation": "One large bicycle spanning adjacent tiles", "pattern": "spanning_object"}}
-"""
-```
-
-**Prompt 存放位置**：
-- 直接放在 `recaptcha_vision_solver.py` 中作為類別常數或方法內字串
-- 不獨立成檔案（避免過度設計）
+**Prompt 實作位置**：
+- 圖片識別 Prompt：`recaptcha_vision_solver.py` 中的 `VISION_PROMPT_TEMPLATE`
+- 包含 3x3 Grid Layout ASCII 視覺化
+- 涵蓋 3 種情境：多個獨立物件、跨格子物件、無物件
 
 **信心度門檻**：
 - 低於 0.7（70%）則放棄，觸發人工處理
@@ -404,39 +294,44 @@ code/cloud-run/
 ## 📅 開發順序（建議）
 
 ```
-第 1 步：環境準備（1 小時）
-├─ 決定 API Key 策略
-├─ 在 Secret Manager 新增對應的 Key
-└─ config.py 新增 Vision API 設定
+[x] 第 1 步：環境準備（已完成）
+    ├─ [x] 決定 API Key 策略（獨立 Vision API Key）
+    ├─ [ ] 在 Secret Manager 新增對應的 Key（Cloud Run 部署時）
+    └─ [x] config.py 新增 Vision API 設定
 
-第 2 步：建立本地測試環境（2 小時）
-├─ 新增 website_automation_test.py
-├─ 新增 recaptcha_vision_solver.py（基礎架構）
-└─ 測試 headless 模式能否觸發圖片驗證
+[x] 第 2 步：建立本地測試環境（已完成）
+    ├─ [x] 新增 website_automation_test.py
+    ├─ [x] 新增 recaptcha_vision_solver.py（基礎架構 + 偵測功能）
+    ├─ [x] 測試 headless 模式能否觸發圖片驗證（✅ 成功觸發）
+    ├─ [x] 實作截圖邏輯（5 個時機點）
+    └─ [x] 優化 Prompt 設計（根據實際測試截圖調整）
 
-第 3 步：開發 Vision Solver 核心（4-6 小時）
-├─ 實作圖片截取邏輯
-├─ 實作提示文字解析（GPT-4.1）
-├─ 實作 Vision API 呼叫
-├─ 實作點擊邏輯
-└─ 實作重試機制（2次）
+[ ] 第 3 步：開發 Vision Solver 核心（4-6 小時）
+    ├─ [ ] 實作圖片截取邏輯（Base64 編碼）
+    ├─ [ ] 實作提示文字解析（GPT-4.1 Text API）
+    ├─ [ ] 實作 Vision API 呼叫
+    ├─ [ ] 實作點擊邏輯（根據 selected_cells）
+    └─ [ ] 實作重試機制（2次，含重新截圖和解析）
 
-第 4 步：本地測試和調整（2-4 小時）
-├─ 使用 website_automation_test.py 測試
-├─ 調整 prompt 和參數
-├─ 驗證成功率
-└─ 錯誤處理測試
+[ ] 第 4 步：本地測試和調整（2-4 小時）
+    ├─ [ ] 使用 website_automation_test.py 測試
+    ├─ [ ] 調整 prompt 和參數（根據識別準確率）
+    ├─ [ ] 驗證成功率
+    └─ [ ] 錯誤處理測試
 
-第 5 步：整合到 Cloud Run（2 小時）
-├─ 修改 website_automation_cloud.py（呼叫 solver）
-├─ 部署到 Cloud Run
-└─ 測試完整流程
+[ ] 第 5 步：整合到 Cloud Run（2 小時）
+    ├─ [ ] 在 Secret Manager 新增 openai-api-key-vision
+    ├─ [ ] 修改 website_automation_cloud.py（呼叫 solver）
+    ├─ [ ] 部署到 Cloud Run
+    └─ [ ] 測試完整流程
 
-第 6 步：真實提交測試（1 小時）
-└─ 階段 2C：真實提交
+[ ] 第 6 步：真實提交測試（1 小時）
+    └─ [ ] 階段 2C：真實提交
 ```
 
-**預估總時間**：12-16 小時
+**預估總時間**：12-16 小時  
+**已完成**：步驟 1-2（約 3 小時）  
+**剩餘**：步驟 3-6（約 9-13 小時）
 
 ---
 
