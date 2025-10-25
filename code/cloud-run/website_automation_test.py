@@ -1,11 +1,13 @@
 """
 Phase 6 - 階段 2B: reCAPTCHA 圖片驗證測試
-本地 headless 環境測試 reCAPTCHA 觸發和偵測
+本地 headless 環境測試 reCAPTCHA 觸發、偵測和解決
 
-第 2 步實作範圍：
+第 2 步實作範圍：偵測和截圖功能 ✅
+第 3 步實作範圍：完整解決流程 ✅
 - 重用 WebsiteAutomation 類別（headless=True）
 - 測試 reCAPTCHA 圖片驗證觸發機率
 - 驗證偵測邏輯是否正確
+- 實際呼叫 Vision API 解決 reCAPTCHA
 - 截圖記錄測試過程
 - print() 輸出測試結果
 """
@@ -37,7 +39,8 @@ def run_recaptcha_trigger_test():
     """
     
     print("=" * 80)
-    print("🧪 reCAPTCHA 圖片驗證觸發測試 - 第 2 步：偵測和截圖功能")
+    print("🧪 reCAPTCHA 圖片驗證測試 - 第 3 步：Vision API 識別驗證")
+    print("⚠️  測試模式：只選圖片，不點擊 Verify（驗證識別準確度）")
     print("=" * 80)
     print()
     
@@ -107,6 +110,8 @@ def run_recaptcha_trigger_test():
         print("\n🔍 偵測是否觸發圖片驗證...")
         image_challenge_detected = solver.detect_image_challenge()
         
+        solve_success = False
+        
         if image_challenge_detected:
             print("\n✅ 偵測到圖片驗證！")
             
@@ -122,12 +127,26 @@ def run_recaptcha_trigger_test():
                 "T4: 圖片網格特寫"
             )
             
+            # 第 3 步：實際解決 reCAPTCHA（測試模式：不點擊 verify）
+            print("\n🔧 開始解決 reCAPTCHA 圖片驗證...")
+            print("⚠️  測試模式：只選圖片，不點擊 Verify 按鈕")
+            print("   目的：確認圖片識別是否正確\n")
+            solve_success = solver.solve_recaptcha(
+                max_retries=2, 
+                click_verify=False,  # 測試模式：不點擊 verify
+                debug_mode=True      # 除錯模式：額外截圖
+            )
+            
         else:
             print("\n❌ 未偵測到圖片驗證（reCAPTCHA 直接通過）")
+            solve_success = True  # 直接通過也算成功
         
-        # T5: 最終表單狀態
+        # T5: 最終表單狀態（等待一下確保畫面穩定）
+        print("\n⏳ 等待 2 秒確保畫面穩定...")
+        automation.page.wait_for_timeout(2000)
+        
         print("\n📸 T5: 最終表單狀態...")
-        solver.take_screenshot("5_final_state.png", "T5: 最終狀態")
+        solver.take_screenshot("7_final_state.png", "T5: 最終狀態")
         
         # 9. 輸出測試結果
         print("\n" + "=" * 80)
@@ -136,17 +155,36 @@ def run_recaptcha_trigger_test():
         print(f"測試時間: {timestamp}")
         print(f"截圖資料夾: {test_screenshot_dir}")
         print(f"圖片驗證觸發: {'✅ 是' if image_challenge_detected else '❌ 否'}")
-        print(f"總截圖數量: {5 if image_challenge_detected else 3}")
-        print()
         
         if image_challenge_detected:
-            print("✅ 測試成功：偵測到圖片驗證，已完成截圖記錄")
-            print("📝 下一步：實作 Vision API 呼叫和圖片識別邏輯")
-        else:
-            print("⚠️  測試結果：本次未觸發圖片驗證")
+            print(f"reCAPTCHA 解決: {'✅ 成功' if solve_success else '❌ 失敗'}")
+            print(f"\n📸 截圖清單：")
+            print(f"  1. 1_before_recaptcha.png - 點擊前")
+            print(f"  2. 2_after_click.png - 點擊後")
+            print(f"  3. 3_image_challenge.png - 圖片驗證畫面")
+            print(f"  4. 4_grid_close_up.png - 圖片網格特寫")
+            print(f"  5. debug_1_prompt_extracted_*.png - 提示文字截圖")
+            print(f"  6. 6_after_selection.png - ⭐ 選完圖片後（verify 前）")
+            print(f"  7. 7_final_state.png - 最終狀態")
+        
+        print()
+        
+        if not image_challenge_detected:
+            print("⚠️  測試結果：本次未觸發圖片驗證（直接通過）")
             print("💡 建議：多次執行測試，或等待部署到 Cloud Run（100%觸發）")
+        elif solve_success:
+            print("✅ 測試模式完成：已選擇圖片但未點擊 Verify")
+            print("📝 請檢查截圖 6_after_selection.png 確認選擇是否正確：")
+            print("   - 查看哪些格子被選中（通常會有視覺標記）")
+            print("   - 對照 Vision API 輸出的格子編號")
+            print("   - 判斷識別是否正確")
+        else:
+            print("❌ 測試失敗：reCAPTCHA 解決失敗")
+            print("📝 建議：檢查錯誤日誌，調整 Prompt 或參數")
         
         print("=" * 80)
+        
+        return solve_success if image_challenge_detected else True
         
     except KeyboardInterrupt:
         print("\n\n⚠️  測試被使用者中斷")
@@ -185,7 +223,7 @@ if __name__ == "__main__":
     
     print("\n" + "🎯 " * 40)
     print("Phase 6 - 階段 2B: reCAPTCHA 本地測試")
-    print("第 2 步：偵測和截圖功能驗證")
+    print("第 3 步：Vision API 圖片識別驗證（測試模式：不點擊 Verify）")
     print("🎯 " * 40 + "\n")
     
     try:

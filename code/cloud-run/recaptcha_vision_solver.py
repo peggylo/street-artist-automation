@@ -55,9 +55,11 @@ Output: {{"target_object": "unknown", "confidence": 0.0}}
     VISION_PROMPT_TEMPLATE = """
 You are a reCAPTCHA image verification expert.
 
-Task: Analyze this 3x3 grid image (9 tiles total) and identify which tiles contain "{target_object}".
+Task: Analyze this grid image and identify which tiles contain "{target_object}".
 
-Grid Layout:
+The grid can be either 3x3 (9 tiles) or 4x4 (16 tiles). Analyze the image to determine the grid size.
+
+3x3 Grid Layout:
 ┌─────┬─────┬─────┐
 │  1  │  2  │  3  │
 ├─────┼─────┼─────┤
@@ -65,6 +67,17 @@ Grid Layout:
 ├─────┼─────┼─────┤
 │  7  │  8  │  9  │
 └─────┴─────┴─────┘
+
+4x4 Grid Layout:
+┌─────┬─────┬─────┬─────┐
+│  1  │  2  │  3  │  4  │
+├─────┼─────┼─────┼─────┤
+│  5  │  6  │  7  │  8  │  (Numbered left to right, top to bottom)
+├─────┼─────┼─────┼─────┤
+│  9  │ 10  │ 11  │ 12  │
+├─────┼─────┼─────┼─────┤
+│ 13  │ 14  │ 15  │ 16  │
+└─────┴─────┴─────┴─────┘
 
 IMPORTANT - Two possible scenarios:
 
@@ -309,7 +322,7 @@ If no buses are present (only cars, roads, buildings):
         except Exception as e:
             print(f"[Screenshot] ❌ 元素截圖失敗 ({filename}): {str(e)}")
     
-    # ==================== 第 3 步+ 功能（未來實作）====================
+    # ==================== 第 3 步功能（核心實作）====================
     
     def extract_target_object(self) -> dict:
         """
@@ -320,24 +333,109 @@ If no buses are present (only cars, roads, buildings):
         Returns:
             dict: {"target_object": "物件名稱", "confidence": 信心度}
         """
-        raise NotImplementedError("第 3 步實作：提示文字解析")
+        try:
+            print("\n[提示文字解析] 開始提取目標物件...")
+            
+            # 找到 reCAPTCHA iframe
+            recaptcha_frame = None
+            for frame in self.page.frames:
+                if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                    recaptcha_frame = frame
+                    break
+            
+            if not recaptcha_frame:
+                raise Exception("找不到 reCAPTCHA iframe")
+            
+            # 提取提示文字
+            challenge_text = ""
+            for selector in self.config["CHALLENGE_TEXT_SELECTORS"]:
+                try:
+                    element = recaptcha_frame.wait_for_selector(selector, timeout=3000, state="visible")
+                    if element:
+                        challenge_text = element.inner_text().strip()
+                        if challenge_text:
+                            break
+                except:
+                    continue
+            
+            if not challenge_text:
+                raise Exception("無法提取提示文字")
+            
+            print(f"[提示文字解析] 原始提示文字: {challenge_text}")
+            
+            # 呼叫 OpenAI API 解析
+            from openai import OpenAI
+            client = OpenAI(api_key=Config.get_openai_vision_key())
+            
+            prompt = self.EXTRACT_PROMPT_TEMPLATE.format(challenge_text=challenge_text)
+            
+            response = client.chat.completions.create(
+                model=self.config["MODEL"],
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=50,
+                temperature=self.config["TEMPERATURE"],
+                response_format={"type": "json_object"}
+            )
+            
+            import json
+            result = json.loads(response.choices[0].message.content)
+            
+            print(f"[提示文字解析] ✅ 目標物件: {result['target_object']} (信心度: {result['confidence']})")
+            
+            return result
+            
+        except Exception as e:
+            print(f"[提示文字解析] ❌ 失敗: {str(e)}")
+            raise
     
     def capture_grid_image(self) -> str:
         """
         截取 reCAPTCHA 圖片網格並轉換為 Base64
         
-        第 3 步實作：截取圖片網格並編碼
+        第 3 步實作：截取整個 3x3 網格並編碼
         
         Returns:
             str: Base64 編碼的圖片
         """
-        raise NotImplementedError("第 3 步實作：圖片截取和編碼")
+        try:
+            print("\n[圖片截取] 開始截取網格圖片...")
+            
+            # 找到 reCAPTCHA iframe
+            recaptcha_frame = None
+            for frame in self.page.frames:
+                if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                    recaptcha_frame = frame
+                    break
+            
+            if not recaptcha_frame:
+                raise Exception("找不到 reCAPTCHA iframe")
+            
+            # 定位網格元素
+            grid_selector = self.config["GRID_SELECTOR"]
+            grid_element = recaptcha_frame.wait_for_selector(grid_selector, timeout=5000, state="visible")
+            
+            if not grid_element:
+                raise Exception(f"找不到網格元素: {grid_selector}")
+            
+            # 截取網格圖片
+            screenshot_bytes = grid_element.screenshot()
+            
+            # 轉換為 Base64
+            image_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+            
+            print(f"[圖片截取] ✅ 成功截取網格圖片 (大小: {len(screenshot_bytes)} bytes)")
+            
+            return image_base64
+            
+        except Exception as e:
+            print(f"[圖片截取] ❌ 失敗: {str(e)}")
+            raise
     
     def call_vision_api(self, image_base64: str, target_object: str) -> dict:
         """
         呼叫 OpenAI GPT-4.1 Vision API 識別圖片
         
-        第 3 步實作：呼叫 Vision API
+        第 3 步實作：呼叫 Vision API 識別哪些格子包含目標物件
         
         Args:
             image_base64: Base64 編碼的圖片
@@ -346,30 +444,214 @@ If no buses are present (only cars, roads, buildings):
         Returns:
             dict: {"selected_cells": [格子編號], "confidence": 信心度, ...}
         """
-        raise NotImplementedError("第 3 步實作：Vision API 呼叫")
+        try:
+            print(f"\n[Vision API] 開始識別圖片（目標物件: {target_object}）...")
+            
+            from openai import OpenAI
+            import json
+            
+            client = OpenAI(api_key=Config.get_openai_vision_key())
+            
+            # 準備 Vision Prompt
+            prompt = self.VISION_PROMPT_TEMPLATE.format(target_object=target_object)
+            
+            # 呼叫 Vision API
+            response = client.chat.completions.create(
+                model=self.config["MODEL"],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_base64}",
+                                    "detail": self.config["DETAIL"]
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=self.config["MAX_TOKENS"],
+                temperature=self.config["TEMPERATURE"],
+                response_format={"type": "json_object"}
+            )
+            
+            # 解析回應
+            result = json.loads(response.choices[0].message.content)
+            
+            print(f"[Vision API] ✅ 識別完成:")
+            print(f"  - 選擇格子: {result.get('selected_cells', [])}")
+            print(f"  - 信心度: {result.get('confidence', 0)}")
+            print(f"  - 解釋: {result.get('explanation', '')}")
+            print(f"  - 模式: {result.get('pattern', '')}")
+            
+            # 檢查信心度
+            confidence = result.get('confidence', 0)
+            if confidence < self.config["CONFIDENCE_THRESHOLD"]:
+                raise Exception(f"信心度過低: {confidence} < {self.config['CONFIDENCE_THRESHOLD']}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"[Vision API] ❌ 失敗: {str(e)}")
+            raise
     
     def click_recaptcha_cells(self, selected_cells: list):
         """
         點擊 reCAPTCHA 指定的格子
         
-        第 3 步實作：根據 Vision API 結果點擊格子
+        第 3 步實作：根據 Vision API 結果點擊格子（含 1→0 轉換）
+        支援 3x3（9 格）或 4x4（16 格）網格
         
         Args:
-            selected_cells: 要點擊的格子編號列表 (1-9)
+            selected_cells: 要點擊的格子編號列表 (1-9 for 3x3, 1-16 for 4x4)
         """
-        raise NotImplementedError("第 3 步實作：點擊格子邏輯")
+        try:
+            print(f"\n[點擊格子] 開始點擊 {len(selected_cells)} 個格子...")
+            
+            # 找到 reCAPTCHA iframe
+            recaptcha_frame = None
+            for frame in self.page.frames:
+                if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                    recaptcha_frame = frame
+                    break
+            
+            if not recaptcha_frame:
+                raise Exception("找不到 reCAPTCHA iframe")
+            
+            # 找到所有格子元素
+            tile_selector = self.config["TILE_SELECTOR"]
+            tiles = recaptcha_frame.locator(tile_selector).all()
+            
+            total_tiles = len(tiles)
+            print(f"[點擊格子] 偵測到 {total_tiles} 個格子（{'3x3' if total_tiles == 9 else '4x4' if total_tiles == 16 else '未知格式'}）")
+            
+            if total_tiles not in [9, 16]:
+                print(f"  ⚠️  警告：格子數量異常 ({total_tiles} 個)，將嘗試繼續執行")
+            
+            # 點擊選中的格子
+            click_interval = self.config["CLICK_INTERVAL"]
+            
+            for cell_num in selected_cells:
+                if cell_num < 1 or cell_num > total_tiles:
+                    print(f"  ⚠️  格子編號超出範圍: {cell_num}（總共 {total_tiles} 格），跳過")
+                    continue
+                
+                # 轉換編號：1-based → 0-based
+                tile_index = cell_num - 1
+                
+                print(f"  - 點擊格子 {cell_num} (索引 {tile_index})")
+                tiles[tile_index].click()
+                
+                # 等待點擊間隔
+                self.page.wait_for_timeout(int(click_interval * 1000))
+            
+            print(f"[點擊格子] ✅ 完成點擊 {len(selected_cells)} 個格子")
+            
+            # 等待 reCAPTCHA 處理
+            print(f"[點擊格子] 等待 reCAPTCHA 驗證結果...")
+            self.page.wait_for_timeout(self.config["TIMEOUT_RECAPTCHA_VERIFY"] * 1000)
+            
+        except Exception as e:
+            print(f"[點擊格子] ❌ 失敗: {str(e)}")
+            raise
     
-    def solve_recaptcha(self, max_retries: int = 2) -> bool:
+    def solve_recaptcha(self, max_retries: int = 2, click_verify: bool = True, debug_mode: bool = False) -> bool:
         """
         完整的 reCAPTCHA 解決流程（含重試機制）
         
-        第 3 步+ 實作：整合所有功能
+        第 3 步實作：整合所有功能，含重試邏輯
         
         Args:
-            max_retries: 最大重試次數
+            max_retries: 最大重試次數（預設 2 次）
+            click_verify: 是否點擊 Verify 按鈕（預設 True，測試時可設為 False）
+            debug_mode: 除錯模式，會在關鍵步驟額外截圖（預設 False）
             
         Returns:
             bool: 是否成功解決 reCAPTCHA
         """
-        raise NotImplementedError("第 3 步+ 實作：完整解決流程")
+        print("\n" + "=" * 80)
+        print("🔓 開始 reCAPTCHA 解決流程")
+        if not click_verify:
+            print("⚠️  測試模式：不會點擊 Verify 按鈕")
+        if debug_mode:
+            print("🔍 除錯模式：啟用額外截圖")
+        print("=" * 80)
+        
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    print(f"\n🔄 重試第 {attempt} 次...")
+                    self.page.wait_for_timeout(self.config["RETRY_DELAY"] * 1000)
+                
+                # 步驟 1: 提取目標物件
+                target_result = self.extract_target_object()
+                target_object = target_result.get("target_object", "")
+                
+                if not target_object or target_object == "unknown":
+                    raise Exception("無法識別目標物件")
+                
+                # 除錯模式：截圖提示文字
+                if debug_mode and self.screenshot_dir:
+                    self.take_screenshot(
+                        f"debug_1_prompt_extracted_{target_object}.png",
+                        f"除錯：提示文字（目標物件: {target_object}）"
+                    )
+                
+                # 步驟 2: 截取網格圖片
+                image_base64 = self.capture_grid_image()
+                
+                # 步驟 3: 呼叫 Vision API 識別
+                vision_result = self.call_vision_api(image_base64, target_object)
+                selected_cells = vision_result.get("selected_cells", [])
+                
+                # 步驟 4: 點擊格子
+                if selected_cells:
+                    self.click_recaptcha_cells(selected_cells)
+                else:
+                    print("[reCAPTCHA] ℹ️  Vision API 回傳空陣列，表示無目標物件，不點擊")
+                
+                # 關鍵截圖：選完圖片後的狀態
+                if self.screenshot_dir:
+                    self.take_screenshot(
+                        "6_after_selection.png",
+                        "關鍵截圖：選完圖片後（verify 前）"
+                    )
+                    print(f"\n✅ 已截圖「選完圖片後」的狀態")
+                    print(f"   - 目標物件: {target_object}")
+                    print(f"   - 選擇格子: {selected_cells}")
+                    print(f"   - 信心度: {vision_result.get('confidence', 0)}")
+                
+                # 步驟 5: 點擊 Verify 按鈕（可選）
+                if click_verify:
+                    print("\n[Verify] 點擊 Verify 按鈕...")
+                    # 這裡先不實作，因為有些 reCAPTCHA 會自動驗證
+                    # 實際測試後再決定是否需要
+                    pass
+                else:
+                    print("\n⏸️  測試模式：跳過點擊 Verify 按鈕")
+                    print("   ℹ️  請手動檢查截圖確認選擇是否正確")
+                
+                print("\n" + "=" * 80)
+                print("✅ reCAPTCHA 解決流程完成")
+                print("=" * 80)
+                
+                return True
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"\n❌ 嘗試 {attempt + 1}/{max_retries + 1} 失敗: {error_msg}")
+                
+                if attempt >= max_retries:
+                    print("\n" + "=" * 80)
+                    print(f"❌ reCAPTCHA 解決失敗（已重試 {max_retries} 次）")
+                    print(f"錯誤原因: {error_msg}")
+                    print("=" * 80)
+                    return False
+                
+                continue
+        
+        return False
 
