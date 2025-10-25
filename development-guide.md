@@ -960,7 +960,7 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 - [x] 完整申請流程串接（LINE對話→文件處理→網站提交）✅ **已完成**
 - [x] 錯誤處理和通知機制（含截圖傳送）✅ **已完成**
 - [x] Cloud Run 回調機制（成功/失敗通知）✅ **已完成**
-- [ ] reCAPTCHA 圖片驗證處理（目前可能觸發，待優化）
+- [ ] reCAPTCHA 圖片驗證處理（詳見 [reCAPTCHA 解決方案](recaptcha-solution.md)）
 - [ ] 人工備案流程（失敗時通知+檔案連結）
 
 #### 🔧 Phase 6 重要 Debug 經驗
@@ -1060,7 +1060,7 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 **當前狀態**：
 - ⏸️ 停在提交前（階段 2B）
 - ✅ 準備進入階段 2C（真實提交）
-- ⚠️ reCAPTCHA 圖片驗證待優化
+- ⚠️ reCAPTCHA 圖片驗證待優化（詳見 [reCAPTCHA 解決方案](recaptcha-solution.md)）
 
 ---
 
