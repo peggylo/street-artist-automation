@@ -39,8 +39,8 @@ def run_recaptcha_trigger_test():
     """
     
     print("=" * 80)
-    print("🧪 reCAPTCHA 圖片驗證測試 - 第 3 步：Vision API 識別驗證")
-    print("⚠️  測試模式：只選圖片，不點擊 Verify（驗證識別準確度）")
+    print("🧪 reCAPTCHA 圖片驗證測試 - 第 4.5 步：完整循環識別測試")
+    print("⚠️  完整流程：循環識別 + 點擊 Verify（真實測試）")
     print("=" * 80)
     print()
     
@@ -127,15 +127,11 @@ def run_recaptcha_trigger_test():
                 "T4: 圖片網格特寫"
             )
             
-            # 第 3 步：實際解決 reCAPTCHA（測試模式：不點擊 verify）
+            # 第 4.5 步：實際解決 reCAPTCHA（完整流程）
             print("\n🔧 開始解決 reCAPTCHA 圖片驗證...")
-            print("⚠️  測試模式：只選圖片，不點擊 Verify 按鈕")
-            print("   目的：確認圖片識別是否正確\n")
-            solve_success = solver.solve_recaptcha(
-                max_retries=2, 
-                click_verify=False,  # 測試模式：不點擊 verify
-                debug_mode=True      # 除錯模式：額外截圖
-            )
+            print("✅ 完整流程：循環識別 + 點擊 Verify")
+            print("   包含：8 輪循環、每輪 2 次 Vision API、JSON 記錄\n")
+            solve_success = solver.solve_recaptcha(max_retries=2)
             
         else:
             print("\n❌ 未偵測到圖片驗證（reCAPTCHA 直接通過）")
@@ -163,9 +159,11 @@ def run_recaptcha_trigger_test():
             print(f"  2. 2_after_click.png - 點擊後")
             print(f"  3. 3_image_challenge.png - 圖片驗證畫面")
             print(f"  4. 4_grid_close_up.png - 圖片網格特寫")
-            print(f"  5. debug_1_prompt_extracted_*.png - 提示文字截圖")
-            print(f"  6. 6_after_selection.png - ⭐ 選完圖片後（verify 前）")
-            print(f"  7. 7_final_state.png - 最終狀態")
+            print(f"  5. 4_prompt_extracted_*.png - 提示文字截圖")
+            print(f"  6. iteration_N_grid.png - 每輪格子截圖")
+            print(f"  7. iteration_N.json - 每輪 Vision API 記錄")
+            print(f"  8. iteration_N_after.png - 每輪點擊後截圖")
+            print(f"  9. 5_final_state.png - 最終狀態")
         
         print()
         
@@ -173,14 +171,15 @@ def run_recaptcha_trigger_test():
             print("⚠️  測試結果：本次未觸發圖片驗證（直接通過）")
             print("💡 建議：多次執行測試，或等待部署到 Cloud Run（100%觸發）")
         elif solve_success:
-            print("✅ 測試模式完成：已選擇圖片但未點擊 Verify")
-            print("📝 請檢查截圖 6_after_selection.png 確認選擇是否正確：")
-            print("   - 查看哪些格子被選中（通常會有視覺標記）")
-            print("   - 對照 Vision API 輸出的格子編號")
-            print("   - 判斷識別是否正確")
+            print("✅ 完整流程測試成功：循環識別 + Verify 提交")
+            print("📝 測試記錄：")
+            print("   - iteration_N_grid.png: 每輪識別的圖片")
+            print("   - iteration_N.json: 每輪 Vision API 詳細回應（含並集）")
+            print("   - iteration_N_after.png: 每輪點擊後的狀態")
+            print("   - 5_final_state.png: 驗證通過的最終狀態")
         else:
             print("❌ 測試失敗：reCAPTCHA 解決失敗")
-            print("📝 建議：檢查錯誤日誌，調整 Prompt 或參數")
+            print("📝 建議：檢查錯誤日誌和截圖，分析失敗原因")
         
         print("=" * 80)
         
@@ -215,15 +214,15 @@ if __name__ == "__main__":
         python website_automation_test.py
     
     注意事項：
-        1. 確保已在 config.py 中設定 RECAPTCHA_VISION["API_KEY"]（第 3 步後才需要）
+        1. 確保已在 config.py 中設定 RECAPTCHA_VISION["API_KEY"]
         2. 本地 headless 環境觸發率較低，可多次執行
         3. Cloud Run 環境 100% 觸發，屆時可穩定測試
-        4. 第 2 步僅測試偵測和截圖功能，不進行圖片識別
+        4. 第 4.5 步為完整流程測試，包含循環識別和 Verify 提交
     """
     
     print("\n" + "🎯 " * 40)
     print("Phase 6 - 階段 2B: reCAPTCHA 本地測試")
-    print("第 3 步：Vision API 圖片識別驗證（測試模式：不點擊 Verify）")
+    print("第 4.5 步：完整循環識別測試（含 Verify 提交）")
     print("🎯 " * 40 + "\n")
     
     try:

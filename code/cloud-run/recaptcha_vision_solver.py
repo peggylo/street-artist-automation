@@ -95,7 +95,7 @@ Scenario C: No target objects present
 - Be certain before returning empty - check all tiles carefully
 
 Instructions:
-1. Carefully examine ALL 9 tiles in the grid
+1. Carefully examine ALL tiles in the grid (9 for 3x3, 16 for 4x4)
 2. Identify tiles containing ANY part of the target object
 3. Include tiles with:
    ✓ Complete objects (entire {target_object} visible)
@@ -106,11 +106,21 @@ Instructions:
    ✗ Completely unrelated content (e.g., trees, buildings, roads without target)
    ✗ Background elements (sky, ground, walls)
 
-Pay special attention to:
+CRITICAL - Pay special attention to:
 - Objects that span multiple tiles (consider all tiles they occupy)
 - Partial views at tile edges (even small visible parts count)
 - Distinguish similar vehicles: bicycles ≠ motorcycles, cars ≠ buses
 - Small or unclear portions that are still part of the target object
+- **Include tiles with PARTIAL views of {target_object}**:
+  • Even if only a small part is visible (e.g., handlebar, wheel)
+  • Even if the object is in the background or far away
+  • Even if the object is partially occluded by other elements
+- **Include tiles with SMALL objects**:
+  • Even if the {target_object} is far away or not the main subject
+  • Small portions still count as containing the target
+- **When in doubt, INCLUDE the tile**:
+  • It's better to select too many than too few
+  • reCAPTCHA prefers over-selection to under-selection
 
 Response format (JSON only):
 {{
@@ -498,6 +508,88 @@ If no buses are present (only cars, roads, buildings):
             print(f"[Vision API] ❌ 失敗: {str(e)}")
             raise
     
+    def click_verify_button(self) -> bool:
+        """
+        點擊 reCAPTCHA Verify 按鈕
+        
+        第 4.5 步實作：支援多個候選選擇器
+        
+        Returns:
+            bool: 是否成功點擊
+        """
+        try:
+            print("\n[Verify] 開始尋找 Verify 按鈕...")
+            
+            # 找到 reCAPTCHA iframe
+            recaptcha_frame = None
+            for frame in self.page.frames:
+                if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                    recaptcha_frame = frame
+                    break
+            
+            if not recaptcha_frame:
+                raise Exception("找不到 reCAPTCHA iframe")
+            
+            # 嘗試多個選擇器
+            for selector in self.config["VERIFY_BUTTON_SELECTORS"]:
+                try:
+                    button = recaptcha_frame.wait_for_selector(
+                        selector, 
+                        timeout=3000, 
+                        state="visible"
+                    )
+                    if button and button.is_visible():
+                        print(f"[Verify] ✅ 找到按鈕: {selector}")
+                        button.click()
+                        print(f"[Verify] ✅ 成功點擊 Verify 按鈕")
+                        return True
+                except:
+                    continue
+            
+            raise Exception("找不到 Verify 按鈕（嘗試了所有選擇器）")
+            
+        except Exception as e:
+            print(f"[Verify] ❌ 點擊失敗: {str(e)}")
+            raise
+    
+    def check_recaptcha_passed(self) -> bool:
+        """
+        檢查 reCAPTCHA 是否通過（消失）
+        
+        第 4.5 步實作：檢查 iframe 和網格是否還存在
+        
+        Returns:
+            bool: True 表示通過（reCAPTCHA 已消失）
+        """
+        try:
+            # 檢查 iframe 是否還存在
+            recaptcha_frame = None
+            for frame in self.page.frames:
+                if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                    recaptcha_frame = frame
+                    break
+            
+            if not recaptcha_frame:
+                print("[驗證] ✅ reCAPTCHA iframe 已消失（驗證通過）")
+                return True
+            
+            # 檢查網格是否還可見
+            try:
+                grid = recaptcha_frame.locator(self.config["GRID_SELECTOR"])
+                if grid.is_visible(timeout=1000):
+                    print("[驗證] ❌ reCAPTCHA 網格仍可見（驗證失敗）")
+                    return False
+            except:
+                # 找不到網格 = 已消失
+                print("[驗證] ✅ reCAPTCHA 網格已消失（驗證通過）")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"[驗證] ⚠️  檢查過程發生錯誤: {str(e)}")
+            return False
+    
     def click_recaptcha_cells(self, selected_cells: list):
         """
         點擊 reCAPTCHA 指定的格子
@@ -558,26 +650,25 @@ If no buses are present (only cars, roads, buildings):
             print(f"[點擊格子] ❌ 失敗: {str(e)}")
             raise
     
-    def solve_recaptcha(self, max_retries: int = 2, click_verify: bool = True, debug_mode: bool = False) -> bool:
+    def solve_recaptcha(self, max_retries: int = 2) -> bool:
         """
-        完整的 reCAPTCHA 解決流程（含重試機制）
+        完整的 reCAPTCHA 解決流程（含循環識別和重試機制）
         
-        第 3 步實作：整合所有功能，含重試邏輯
+        第 4.5 步實作：
+        - 循環識別邏輯（最多 8 輪）
+        - 每輪呼叫 Vision API 兩次取並集
+        - 三個提前結束條件
+        - 循環結束後點擊 Verify
+        - JSON 記錄儲存（點擊前記錄）
         
         Args:
             max_retries: 最大重試次數（預設 2 次）
-            click_verify: 是否點擊 Verify 按鈕（預設 True，測試時可設為 False）
-            debug_mode: 除錯模式，會在關鍵步驟額外截圖（預設 False）
             
         Returns:
             bool: 是否成功解決 reCAPTCHA
         """
         print("\n" + "=" * 80)
-        print("🔓 開始 reCAPTCHA 解決流程")
-        if not click_verify:
-            print("⚠️  測試模式：不會點擊 Verify 按鈕")
-        if debug_mode:
-            print("🔍 除錯模式：啟用額外截圖")
+        print("🔓 開始 reCAPTCHA 解決流程（含循環識別）")
         print("=" * 80)
         
         for attempt in range(max_retries + 1):
@@ -593,56 +684,173 @@ If no buses are present (only cars, roads, buildings):
                 if not target_object or target_object == "unknown":
                     raise Exception("無法識別目標物件")
                 
-                # 除錯模式：截圖提示文字
-                if debug_mode and self.screenshot_dir:
-                    self.take_screenshot(
-                        f"debug_1_prompt_extracted_{target_object}.png",
-                        f"除錯：提示文字（目標物件: {target_object}）"
-                    )
-                
-                # 步驟 2: 截取網格圖片
-                image_base64 = self.capture_grid_image()
-                
-                # 步驟 3: 呼叫 Vision API 識別
-                vision_result = self.call_vision_api(image_base64, target_object)
-                selected_cells = vision_result.get("selected_cells", [])
-                
-                # 步驟 4: 點擊格子
-                if selected_cells:
-                    self.click_recaptcha_cells(selected_cells)
-                else:
-                    print("[reCAPTCHA] ℹ️  Vision API 回傳空陣列，表示無目標物件，不點擊")
-                
-                # 關鍵截圖：選完圖片後的狀態
+                # 截圖提示文字（本地測試時記錄）
                 if self.screenshot_dir:
                     self.take_screenshot(
-                        "6_after_selection.png",
-                        "關鍵截圖：選完圖片後（verify 前）"
+                        f"4_prompt_extracted_{target_object}.png",
+                        f"提示文字（目標物件: {target_object}）"
                     )
-                    print(f"\n✅ 已截圖「選完圖片後」的狀態")
-                    print(f"   - 目標物件: {target_object}")
-                    print(f"   - 選擇格子: {selected_cells}")
-                    print(f"   - 信心度: {vision_result.get('confidence', 0)}")
                 
-                # 步驟 5: 點擊 Verify 按鈕（可選）
-                if click_verify:
-                    print("\n[Verify] 點擊 Verify 按鈕...")
-                    # 這裡先不實作，因為有些 reCAPTCHA 會自動驗證
-                    # 實際測試後再決定是否需要
-                    pass
+                # === 循環識別階段 ===
+                max_iterations = self.config["MAX_ITERATIONS"]
+                wait_after_click = self.config["WAIT_AFTER_CLICK"]
+                
+                print(f"\n🔄 開始循環識別（最多 {max_iterations} 輪）")
+                
+                for iteration in range(1, max_iterations + 1):
+                    print(f"\n--- 第 {iteration} 輪識別 ---")
+                    
+                    # 條件 A：檢查 reCAPTCHA 是否還存在（提前結束）
+                    # 
+                    # 理論情境：reCAPTCHA 在點擊格子後重新評估用戶行為，判定為人類而自動通過
+                    # 實際機率：在 Cloud Run headless 環境幾乎不可能發生
+                    # 保留原因：
+                    # 1. 防禦性編程 - 避免極端情況導致無限循環
+                    # 2. 檢查成本極低 - 只是一個 iframe 和網格可見性檢查
+                    # 3. 安全退出機制 - 即使發生預期外情況也能正常結束
+                    if not self.check_recaptcha_passed():
+                        # reCAPTCHA 還在，繼續處理
+                        pass
+                    else:
+                        # reCAPTCHA 已經消失了（條件 A 觸發）
+                        print(f"✅ reCAPTCHA 已自動通過（第 {iteration-1} 輪後）")
+                        print("   ℹ️  這種情況在 headless 環境極為罕見")
+                        return True  # 提前成功
+                    
+                    # 步驟 2: 截取網格圖片
+                    image_base64 = self.capture_grid_image()
+                    
+                    # 本地測試：儲存格子截圖
+                    if self.screenshot_dir:
+                        # 將 base64 圖片儲存為檔案
+                        import base64
+                        grid_image_bytes = base64.b64decode(image_base64)
+                        grid_image_path = os.path.join(self.screenshot_dir, f"iteration_{iteration}_grid.png")
+                        with open(grid_image_path, "wb") as f:
+                            f.write(grid_image_bytes)
+                        print(f"[截圖] 已儲存格子截圖: iteration_{iteration}_grid.png")
+                    
+                    # 步驟 3: 呼叫 Vision API 兩次，取並集
+                    print(f"[Vision API] 呼叫第 1 次...")
+                    result_1 = self.call_vision_api(image_base64, target_object)
+                    
+                    print(f"[Vision API] 呼叫第 2 次...")
+                    result_2 = self.call_vision_api(image_base64, target_object)
+                    
+                    # 取並集
+                    cells_1 = set(result_1.get("selected_cells", []))
+                    cells_2 = set(result_2.get("selected_cells", []))
+                    final_cells = sorted(list(cells_1.union(cells_2)))
+                    
+                    print(f"[並集] 第 1 次: {sorted(cells_1)}, 第 2 次: {sorted(cells_2)} → 最終: {final_cells}")
+                    
+                    # 步驟 4: 儲存 JSON 記錄（點擊前記錄）
+                    if self.screenshot_dir:
+                        import json
+                        json_data = {
+                            "iteration": iteration,
+                            "target_object": target_object,
+                            "call_1": {
+                                "selected_cells": result_1.get("selected_cells", []),
+                                "confidence": result_1.get("confidence", 0),
+                                "explanation": result_1.get("explanation", ""),
+                                "pattern": result_1.get("pattern", "")
+                            },
+                            "call_2": {
+                                "selected_cells": result_2.get("selected_cells", []),
+                                "confidence": result_2.get("confidence", 0),
+                                "explanation": result_2.get("explanation", ""),
+                                "pattern": result_2.get("pattern", "")
+                            },
+                            "final_result": {
+                                "selected_cells": final_cells,
+                                "union_of": [sorted(cells_1), sorted(cells_2)]
+                            },
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        json_path = os.path.join(self.screenshot_dir, f"iteration_{iteration}.json")
+                        with open(json_path, "w", encoding="utf-8") as f:
+                            json.dump(json_data, f, indent=2, ensure_ascii=False)
+                        print(f"[JSON] 已儲存記錄: iteration_{iteration}.json")
+                    
+                    # 條件 B：如果沒有目標物件了，跳出循環（提前結束）
+                    if not final_cells:
+                        print(f"✅ 沒有目標物件了（第 {iteration} 輪）")
+                        if iteration == 1:
+                            print("   ℹ️  第 1 輪就無物件，可能是誤判，仍將提交（依賴重試機制）")
+                        break  # 跳出循環，準備點擊 Verify
+                    
+                    # 步驟 5: 點擊所有識別到的格子
+                    print(f"[點擊] 點擊 {len(final_cells)} 個格子: {final_cells}")
+                    
+                    # 找到 reCAPTCHA iframe
+                    recaptcha_frame = None
+                    for frame in self.page.frames:
+                        if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                            recaptcha_frame = frame
+                            break
+                    
+                    if not recaptcha_frame:
+                        raise Exception("找不到 reCAPTCHA iframe")
+                    
+                    # 找到所有格子元素
+                    tiles = recaptcha_frame.locator(self.config["TILE_SELECTOR"]).all()
+                    click_interval = self.config["CLICK_INTERVAL"]
+                    
+                    for cell_num in final_cells:
+                        tile_index = cell_num - 1  # 1-based → 0-based
+                        if 0 <= tile_index < len(tiles):
+                            tiles[tile_index].click()
+                            self.page.wait_for_timeout(int(click_interval * 1000))
+                    
+                    # 步驟 6: 等待圖片更新（點擊後格子會自動更新圖片）
+                    print(f"[等待] 等待 {wait_after_click} 秒讓圖片更新...")
+                    self.page.wait_for_timeout(int(wait_after_click * 1000))
+                    
+                    # 步驟 7: 截圖整頁（點擊後狀態）
+                    if self.screenshot_dir:
+                        self.take_screenshot(
+                            f"iteration_{iteration}_after.png",
+                            f"第 {iteration} 輪點擊後"
+                        )
+                
+                # 條件 C：達到最大迭代次數（循環自然結束）
+                if iteration >= max_iterations:
+                    print(f"\n⚠️  達到最大迭代次數 {max_iterations} 輪")
+                
+                # === 提交答案階段 ===
+                print("\n=== 點擊 Verify 提交答案 ===")
+                self.click_verify_button()
+                
+                # 等待驗證結果
+                print("[等待] 等待 3 秒驗證結果...")
+                self.page.wait_for_timeout(3000)
+                
+                # 檢查驗證是否通過
+                if self.check_recaptcha_passed():
+                    print("\n✅ reCAPTCHA 驗證通過！")
+                    
+                    # 最終截圖
+                    if self.screenshot_dir:
+                        self.take_screenshot("5_final_state.png", "最終狀態（驗證通過）")
+                    
+                    print("\n" + "=" * 80)
+                    print("✅ reCAPTCHA 解決流程完成")
+                    print("=" * 80)
+                    return True
                 else:
-                    print("\n⏸️  測試模式：跳過點擊 Verify 按鈕")
-                    print("   ℹ️  請手動檢查截圖確認選擇是否正確")
-                
-                print("\n" + "=" * 80)
-                print("✅ reCAPTCHA 解決流程完成")
-                print("=" * 80)
-                
-                return True
+                    raise Exception("reCAPTCHA 驗證失敗（Verify 後網格仍存在）")
                 
             except Exception as e:
                 error_msg = str(e)
                 print(f"\n❌ 嘗試 {attempt + 1}/{max_retries + 1} 失敗: {error_msg}")
+                
+                # 失敗截圖
+                if self.screenshot_dir:
+                    self.take_screenshot(
+                        f"error_attempt_{attempt + 1}.png",
+                        f"錯誤截圖（嘗試 {attempt + 1}）"
+                    )
                 
                 if attempt >= max_retries:
                     print("\n" + "=" * 80)
