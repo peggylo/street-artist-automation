@@ -232,11 +232,21 @@ TIMEOUT_CONFIG = {
 }
 ```
 
+**JSON 記錄時機**：
+- **時機點**：點擊格子「前」記錄（呼叫 Vision API 後、點擊執行前）
+- **記錄內容**：AI 對當前圖片的判斷結果
+- **語義定義**：記錄的是「判斷」而非「執行結果」
+- **對應關係**：
+  - `iteration_N_grid.png` = 輸入（AI 看到的圖片）
+  - `iteration_N.json` = 處理（AI 的判斷結果）
+  - `iteration_N_after.png` = 輸出（點擊後的狀態）
+
 **JSON 用途**：
 - ✅ 純記錄用（事後人工分析）
 - ❌ 程式不讀取（使用記憶體中的變數）
 - ✅ 對照截圖分析識別準確度
 - ✅ 追蹤信心度變化
+- ✅ 除錯 Vision API 回應
 
 **輸出方式**：
 - 只用 `print()` 輸出測試結果
@@ -477,7 +487,12 @@ else:
   - 網格可見：`frame.locator(".rc-imageselect-target").is_visible()`
   - **兩者都滿足** → reCAPTCHA 還在，繼續循環
   - **任一不滿足** → reCAPTCHA 已消失
-- **原因**：reCAPTCHA 判定為人類，自動通過（不確定是否會發生，保守檢查）
+- **原因**：reCAPTCHA 判定為人類，自動通過
+- **實際機率**：在 Cloud Run headless 環境幾乎不可能發生（reCAPTCHA 已判定為機器人才觸發圖片驗證）
+- **保留理由**：
+  1. 防禦性編程 - 避免極端情況導致無限循環
+  2. 檢查成本極低 - 只是一個 iframe 和網格可見性檢查
+  3. 安全退出機制 - 即使發生預期外情況也能正常結束
 - **處理**：直接返回成功，不點擊 Verify（因為已經沒有按鈕了）
 
 **條件 B：沒有目標物件**
@@ -486,8 +501,9 @@ else:
 - **原因**：所有格子都不包含目標物件
 - **處理**：跳出循環，點擊 Verify 提交答案
 - **適用場景**：
-  - 第 1 輪就沒有目標物件（可能誤判，仍要提交）
+  - 第 1 輪就沒有目標物件（可能誤判，仍要提交，依賴外層重試機制）
   - 第 N 輪後所有目標物件都被選完
+- **決策說明**：採用方案 A（文件當前策略），即使第 1 輪就無目標物件也提交，避免過度複雜化邏輯
 
 **條件 C：達到最大迭代次數（8 輪）**
 - **檢查時機**：循環自然結束
@@ -589,8 +605,13 @@ CRITICAL INSTRUCTIONS:
    - 補充缺少的選擇器：
      - `GRID_SELECTOR`: ".rc-imageselect-target"（整個網格）
      - `TILE_SELECTOR`: ".rc-imageselect-tile"（單個格子）
-     - `VERIFY_BUTTON_SELECTOR`: "#recaptcha-verify-button"（驗證按鈕）
+     - `VERIFY_BUTTON_SELECTORS`: 多個候選選擇器列表（詳見下方說明）
      - `RECAPTCHA_IFRAME_PATTERN`: "bframe"（iframe 識別）
+   - **Verify 按鈕選擇器**（按優先順序嘗試）：
+     - `"#recaptcha-verify-button"` - 標準 ID（最常見）
+     - `".rc-button-default"` - 標準 Class
+     - `"button[value='Verify']"` - 按鈕值
+     - `"//button[contains(text(), 'Verify')]"` - XPath 文字匹配（最通用）
 
 3. **`recaptcha_vision_solver.py`** ✅（基礎版）→ 🔄（循環版）
    - 實作 `extract_target_object()` - 提示文字解析 ✅
@@ -601,23 +622,31 @@ CRITICAL INSTRUCTIONS:
    - **新增**：循環識別邏輯（8 輪迭代）🔄
    - **新增**：多次呼叫取並集（每輪 2 次 Vision API）🔄
    - **新增**：提前結束判斷（三個條件）🔄
-     - 條件 A：reCAPTCHA 消失檢查（iframe + 網格可見）
-     - 條件 B：無目標物件
+     - 條件 A：reCAPTCHA 消失檢查（iframe + 網格可見，加註解說明機率低）
+     - 條件 B：無目標物件（第 1 輪也提交，依賴重試機制）
      - 條件 C：達到 8 輪上限
    - **新增**：Verify 按鈕點擊邏輯（循環結束後）🔄
+     - 實作 `click_verify_button()` - 點擊 Verify 按鈕
+     - 支援多個候選選擇器（依優先順序嘗試）
+     - 實作 `check_recaptcha_passed()` - 檢查驗證是否通過
    - **新增**：驗證結果判定（reCAPTCHA 是否消失）🔄
-   - **新增**：JSON 記錄儲存（每輪一個檔案）🔄
+   - **新增**：JSON 記錄儲存（每輪一個檔案，點擊前記錄）🔄
    - **新增**：優化 Prompt（加強部分可見和小物件指示）🔄
-   - **移除**：`debug_mode` 參數（簡化設計）🔄
-   - **移除**：`click_verify` 參數（改為預設行為）🔄
+   - **調整**：保留所有記錄（截圖 + JSON 預設執行）🔄
+     - 本地測試：方便調試和分析
+     - Cloud Run：問題發生時可追蹤完整過程
+     - 透過 `screenshot_dir` 是否設定來判斷是否儲存截圖
+   - **移除**：`debug_mode` 參數（所有記錄預設執行，簡化設計）🔄
+   - **移除**：`click_verify` 參數（第 4.5 步直接點擊 Verify，改為預設行為）🔄
 
 4. **`website_automation_test.py`** ✅（基礎版）→ 🔄（循環版）
    - 修改測試邏輯：從偵測改為實際解決 ✅
-   - 呼叫 `solver.solve_recaptcha(max_retries=2)` ✅
+   - 呼叫 `solver.solve_recaptcha(max_retries=2)` ✅（不再傳遞參數）
    - **新增**：支援循環截圖（每輪記錄）🔄
-   - **移除**：`debug_mode=True` 參數（不再需要）🔄
-   - **移除**：`click_verify` 參數（改為預設行為）🔄
+   - **移除**：`debug_mode=True` 參數（所有記錄預設執行）🔄
+   - **移除**：`click_verify` 參數（第 4.5 步直接點擊 Verify）🔄
    - **簡化**：測試腳本只負責觸發和記錄，循環邏輯在 solver 內🔄
+   - **決策說明**：第 4.5 步測試的是完整流程（含 Verify），不再有「測試模式」
 
 ---
 
@@ -806,6 +835,6 @@ CRITICAL INSTRUCTIONS:
 ---
 
 **建立時間**：2025年10月25日  
-**最後更新**：2025年10月25日  
+**最後更新**：2025年10月26日  
 **當前階段**：Phase 6 - 第 4.5 步（優化循環邏輯）
 
