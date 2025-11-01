@@ -718,10 +718,10 @@ If no buses are present (only cars, roads, buildings):
                         print(f"✅ reCAPTCHA 已自動通過（第 {iteration-1} 輪後）")
                         print("   ℹ️  這種情況在 headless 環境極為罕見")
                         return True  # 提前成功
-                
-                # 步驟 2: 截取網格圖片
-                image_base64 = self.capture_grid_image()
-                
+                    
+                    # 步驟 2: 截取網格圖片
+                    image_base64 = self.capture_grid_image()
+                    
                     # 本地測試：儲存格子截圖
                     if self.screenshot_dir:
                         # 將 base64 圖片儲存為檔案
@@ -836,11 +836,11 @@ If no buses are present (only cars, roads, buildings):
                     # 最終截圖
                     if self.screenshot_dir:
                         self.take_screenshot("5_final_state.png", "最終狀態（驗證通過）")
-                
-                print("\n" + "=" * 80)
-                print("✅ reCAPTCHA 解決流程完成")
-                print("=" * 80)
-                return True
+                    
+                    print("\n" + "=" * 80)
+                    print("✅ reCAPTCHA 解決流程完成")
+                    print("=" * 80)
+                    return True
                 else:
                     raise Exception("reCAPTCHA 驗證失敗（Verify 後網格仍存在）")
                 
