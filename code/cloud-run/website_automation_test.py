@@ -156,6 +156,30 @@ def run_recaptcha_trigger_test():
         popup_info = ""
         
         try:
+            # 0. 清理可能殘留的 reCAPTCHA iframe
+            print("\n🧹 步驟 0: 檢查並清理殘留的 reCAPTCHA iframe...")
+            iframe_found = False
+            for frame in automation.page.frames:
+                if "recaptcha" in frame.url.lower():
+                    print(f"   ⚠️  發現殘留的 reCAPTCHA iframe: {frame.url}")
+                    iframe_found = True
+                    break
+            
+            if iframe_found:
+                # 使用 JavaScript 強制移除所有 reCAPTCHA iframe
+                automation.page.evaluate("""
+                    const frames = document.querySelectorAll('iframe[src*="recaptcha"]');
+                    console.log('找到 ' + frames.length + ' 個 reCAPTCHA iframe');
+                    frames.forEach(f => {
+                        console.log('移除 iframe:', f.src);
+                        f.remove();
+                    });
+                """)
+                print("   ✅ 已移除 reCAPTCHA iframe")
+                automation.page.wait_for_timeout(1000)  # 等待 1 秒讓頁面穩定
+            else:
+                print("   ✅ 沒有發現殘留的 reCAPTCHA iframe")
+            
             # 1. 嘗試勾選 checkbox
             print("\n📋 步驟 1: 勾選「我已充分閱讀申請事項...」checkbox")
             checkbox = automation.page.locator("input#signup")
