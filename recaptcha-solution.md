@@ -169,7 +169,20 @@ TIMEOUT_CONFIG = {
 - ✅ 測試 PDF：`申請表_2025年11月_1106_2358.pdf`（FILE_ID: ***REMOVED***）
 - ✅ 街頭藝人證：`街頭藝人證.jpg`（FILE_ID: ***REMOVED***）
 
-### 9. 本地測試截圖結構（已確定 - 2025年10月25日更新）
+### 9. 本地測試截圖結構（已確定 - 2025年10月26日更新）
+
+#### 檔案命名方案（方案 C - 2025年10月26日確定）
+
+**命名格式**：
+- `a{N}` = attempt N（嘗試次數，1-based）
+- `i{N}` = iteration N（循環輪數，1-based）
+- 簡潔命名提升可讀性，按檔名自動排序
+
+**優點**：
+- ✅ 簡潔易讀（相比完整單字）
+- ✅ 扁平結構，方便排序查看
+- ✅ 避免重試時檔案覆蓋
+- ✅ 時間順序清晰
 
 #### 測試資料夾完整結構
 ```
@@ -177,23 +190,32 @@ TIMEOUT_CONFIG = {
 ├── 圖片選擇驗證1.png（既有）
 ├── 圖片選擇驗證2.png（既有）
 └── recaptcha_test/（新增，本地測試專用）
-    └── trigger_test_20251025_185216/（單次測試資料夾）
-        ├── 1_before_recaptcha.png             (整頁) 點擊 checkbox 前
-        ├── 2_after_click.png                  (整頁) 點擊 checkbox 後
-        ├── 3_image_challenge.png              (整頁) 圖片驗證畫面
-        ├── 4_prompt_extracted_{object}.png    (整頁) 提示文字提取
+    └── trigger_test_20251026_092132/（單次測試資料夾）
+        ├── 0_before_recaptcha.png          (整頁) 點擊 checkbox 前
+        ├── 0_after_click.png               (整頁) 點擊 checkbox 後
+        ├── 0_image_challenge.png           (整頁) 圖片驗證畫面
+        ├── 0_grid_close_up.png             (格子) 圖片網格特寫
         │
-        ├── iteration_1_grid.png               (格子) 第 1 輪識別用
-        ├── iteration_1.json                   (JSON) 第 1 輪 Vision API 記錄
-        ├── iteration_1_after.png              (整頁) 第 1 輪點擊後
-        │
-        ├── iteration_2_grid.png               (格子) 第 2 輪識別用
-        ├── iteration_2.json                   (JSON) 第 2 輪 Vision API 記錄
-        ├── iteration_2_after.png              (整頁) 第 2 輪點擊後
-        │
+        ├── a1_prompt_fire_hydrant.png      (整頁) 嘗試 1 - 提示文字提取
+        ├── a1_i1_grid.png                  (格子) 嘗試 1 - 第 1 輪識別用
+        ├── a1_i1.json                      (JSON) 嘗試 1 - 第 1 輪 Vision API 記錄
+        ├── a1_i1_after.png                 (整頁) 嘗試 1 - 第 1 輪點擊後
+        ├── a1_i2_grid.png                  (格子) 嘗試 1 - 第 2 輪識別用
+        ├── a1_i2.json                      (JSON) 嘗試 1 - 第 2 輪 Vision API 記錄
+        ├── a1_i2_after.png                 (整頁) 嘗試 1 - 第 2 輪點擊後
         ├── ... (最多 8 輪)
+        ├── a1_error.png                    (整頁) 嘗試 1 - 失敗截圖
         │
-        └── 5_final_state.png                  (整頁) 最終狀態
+        ├── a2_prompt_cars.png              (整頁) 嘗試 2 - 提示文字提取
+        ├── a2_i1_grid.png                  (格子) 嘗試 2 - 第 1 輪識別用
+        ├── a2_i1.json                      (JSON) 嘗試 2 - 第 1 輪 Vision API 記錄
+        ├── ... (嘗試 2 的所有輪次)
+        ├── a2_error.png                    (整頁) 嘗試 2 - 失敗截圖
+        │
+        ├── a3_prompt_bus.png               (整頁) 嘗試 3 - 提示文字提取
+        ├── ... (嘗試 3 的所有輪次)
+        │
+        └── 9_final_state.png               (整頁) 最終狀態
 ```
 
 **截圖時機點**：

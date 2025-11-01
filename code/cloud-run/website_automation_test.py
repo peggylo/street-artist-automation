@@ -91,7 +91,7 @@ def run_recaptcha_trigger_test():
         
         # T1: 點擊 reCAPTCHA 前
         print("\n📸 T1: 點擊 reCAPTCHA 前的截圖...")
-        solver.take_screenshot("1_before_recaptcha.png", "T1: 點擊前")
+        solver.take_screenshot("0_before_recaptcha.png", "T1: 點擊前")
         
         # 7. 點擊 reCAPTCHA checkbox
         print("\n☑️  點擊 reCAPTCHA checkbox...")
@@ -104,7 +104,7 @@ def run_recaptcha_trigger_test():
         
         # T2: 點擊後檢查狀態
         print("\n📸 T2: 點擊後的截圖...")
-        solver.take_screenshot("2_after_click.png", "T2: 點擊後")
+        solver.take_screenshot("0_after_click.png", "T2: 點擊後")
         
         # 8. 偵測圖片驗證
         print("\n🔍 偵測是否觸發圖片驗證...")
@@ -117,13 +117,13 @@ def run_recaptcha_trigger_test():
             
             # T3: 圖片挑戰畫面
             print("\n📸 T3: 圖片驗證畫面...")
-            solver.take_screenshot("3_image_challenge.png", "T3: 圖片驗證")
+            solver.take_screenshot("0_image_challenge.png", "T3: 圖片驗證")
             
             # T4: 圖片網格特寫
             print("\n📸 T4: 圖片網格特寫...")
             solver.take_element_screenshot(
                 ".rc-imageselect-target",
-                "4_grid_close_up.png",
+                "0_grid_close_up.png",
                 "T4: 圖片網格特寫"
             )
             
@@ -142,7 +142,7 @@ def run_recaptcha_trigger_test():
         automation.page.wait_for_timeout(2000)
         
         print("\n📸 T5: 最終表單狀態...")
-        solver.take_screenshot("7_final_state.png", "T5: 最終狀態")
+        solver.take_screenshot("9_final_state.png", "T5: 最終狀態")
         
         # 9. 輸出測試結果
         print("\n" + "=" * 80)
@@ -155,15 +155,16 @@ def run_recaptcha_trigger_test():
         if image_challenge_detected:
             print(f"reCAPTCHA 解決: {'✅ 成功' if solve_success else '❌ 失敗'}")
             print(f"\n📸 截圖清單：")
-            print(f"  1. 1_before_recaptcha.png - 點擊前")
-            print(f"  2. 2_after_click.png - 點擊後")
-            print(f"  3. 3_image_challenge.png - 圖片驗證畫面")
-            print(f"  4. 4_grid_close_up.png - 圖片網格特寫")
-            print(f"  5. 4_prompt_extracted_*.png - 提示文字截圖")
-            print(f"  6. iteration_N_grid.png - 每輪格子截圖")
-            print(f"  7. iteration_N.json - 每輪 Vision API 記錄")
-            print(f"  8. iteration_N_after.png - 每輪點擊後截圖")
-            print(f"  9. 5_final_state.png - 最終狀態")
+            print(f"  1. 0_before_recaptcha.png - 點擊前")
+            print(f"  2. 0_after_click.png - 點擊後")
+            print(f"  3. 0_image_challenge.png - 圖片驗證畫面")
+            print(f"  4. 0_grid_close_up.png - 圖片網格特寫")
+            print(f"  5. a{{N}}_prompt_*.png - 嘗試 {{N}} 提示文字截圖")
+            print(f"  6. a{{N}}_i{{M}}_grid.png - 嘗試 {{N}} 第 {{M}} 輪格子截圖")
+            print(f"  7. a{{N}}_i{{M}}.json - 嘗試 {{N}} 第 {{M}} 輪 Vision API 記錄")
+            print(f"  8. a{{N}}_i{{M}}_after.png - 嘗試 {{N}} 第 {{M}} 輪點擊後截圖")
+            print(f"  9. a{{N}}_error.png - 嘗試 {{N}} 錯誤截圖")
+            print(f" 10. 9_final_state.png - 最終狀態")
         
         print()
         
@@ -173,10 +174,10 @@ def run_recaptcha_trigger_test():
         elif solve_success:
             print("✅ 完整流程測試成功：循環識別 + Verify 提交")
             print("📝 測試記錄：")
-            print("   - iteration_N_grid.png: 每輪識別的圖片")
-            print("   - iteration_N.json: 每輪 Vision API 詳細回應（含並集）")
-            print("   - iteration_N_after.png: 每輪點擊後的狀態")
-            print("   - 5_final_state.png: 驗證通過的最終狀態")
+            print("   - a{{N}}_i{{M}}_grid.png: 嘗試 {{N}} 第 {{M}} 輪識別的圖片")
+            print("   - a{{N}}_i{{M}}.json: 嘗試 {{N}} 第 {{M}} 輪 Vision API 詳細回應（含並集）")
+            print("   - a{{N}}_i{{M}}_after.png: 嘗試 {{N}} 第 {{M}} 輪點擊後的狀態")
+            print("   - 9_final_state.png: 驗證通過的最終狀態")
         else:
             print("❌ 測試失敗：reCAPTCHA 解決失敗")
             print("📝 建議：檢查錯誤日誌和截圖，分析失敗原因")

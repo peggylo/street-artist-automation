@@ -673,6 +673,8 @@ If no buses are present (only cars, roads, buildings):
         
         for attempt in range(max_retries + 1):
             try:
+                attempt_num = attempt + 1  # 1-based 編號（a1, a2, a3）
+                
                 if attempt > 0:
                     print(f"\n🔄 重試第 {attempt} 次...")
                     self.page.wait_for_timeout(self.config["RETRY_DELAY"] * 1000)
@@ -687,8 +689,8 @@ If no buses are present (only cars, roads, buildings):
                 # 截圖提示文字（本地測試時記錄）
                 if self.screenshot_dir:
                     self.take_screenshot(
-                        f"4_prompt_extracted_{target_object}.png",
-                        f"提示文字（目標物件: {target_object}）"
+                        f"a{attempt_num}_prompt_{target_object}.png",
+                        f"嘗試 {attempt_num} - 提示文字（目標物件: {target_object}）"
                     )
                 
                 # === 循環識別階段 ===
@@ -725,10 +727,10 @@ If no buses are present (only cars, roads, buildings):
                         # 將 base64 圖片儲存為檔案
                         import base64
                         grid_image_bytes = base64.b64decode(image_base64)
-                        grid_image_path = os.path.join(self.screenshot_dir, f"iteration_{iteration}_grid.png")
+                        grid_image_path = os.path.join(self.screenshot_dir, f"a{attempt_num}_i{iteration}_grid.png")
                         with open(grid_image_path, "wb") as f:
                             f.write(grid_image_bytes)
-                        print(f"[截圖] 已儲存格子截圖: iteration_{iteration}_grid.png")
+                        print(f"[截圖] 已儲存格子截圖: a{attempt_num}_i{iteration}_grid.png")
                     
                     # 步驟 3: 呼叫 Vision API 兩次，取並集
                     print(f"[Vision API] 呼叫第 1 次...")
@@ -748,6 +750,7 @@ If no buses are present (only cars, roads, buildings):
                     if self.screenshot_dir:
                         import json
                         json_data = {
+                            "attempt": attempt_num,
                             "iteration": iteration,
                             "target_object": target_object,
                             "call_1": {
@@ -768,10 +771,10 @@ If no buses are present (only cars, roads, buildings):
                             },
                             "timestamp": datetime.now().isoformat()
                         }
-                        json_path = os.path.join(self.screenshot_dir, f"iteration_{iteration}.json")
+                        json_path = os.path.join(self.screenshot_dir, f"a{attempt_num}_i{iteration}.json")
                         with open(json_path, "w", encoding="utf-8") as f:
                             json.dump(json_data, f, indent=2, ensure_ascii=False)
-                        print(f"[JSON] 已儲存記錄: iteration_{iteration}.json")
+                        print(f"[JSON] 已儲存記錄: a{attempt_num}_i{iteration}.json")
                     
                     # 條件 B：如果沒有目標物件了，跳出循環（提前結束）
                     if not final_cells:
@@ -810,8 +813,8 @@ If no buses are present (only cars, roads, buildings):
                     # 步驟 7: 截圖整頁（點擊後狀態）
                     if self.screenshot_dir:
                         self.take_screenshot(
-                            f"iteration_{iteration}_after.png",
-                            f"第 {iteration} 輪點擊後"
+                            f"a{attempt_num}_i{iteration}_after.png",
+                            f"嘗試 {attempt_num} - 第 {iteration} 輪點擊後"
                         )
                 
                 # 條件 C：達到最大迭代次數（循環自然結束）
@@ -848,8 +851,8 @@ If no buses are present (only cars, roads, buildings):
                 # 失敗截圖
                 if self.screenshot_dir:
                     self.take_screenshot(
-                        f"error_attempt_{attempt + 1}.png",
-                        f"錯誤截圖（嘗試 {attempt + 1}）"
+                        f"a{attempt_num}_error.png",
+                        f"嘗試 {attempt_num} - 錯誤截圖"
                     )
                 
                 if attempt >= max_retries:
