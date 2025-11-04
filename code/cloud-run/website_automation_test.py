@@ -180,9 +180,100 @@ def run_recaptcha_trigger_test():
             else:
                 print("   ✅ 沒有發現殘留的 reCAPTCHA iframe")
             
-            # 1. 嘗試勾選 checkbox
-            print("\n📋 步驟 1: 勾選「我已充分閱讀申請事項...」checkbox")
+            # 1. 除錯：檢查 checkbox 狀態
+            print("\n🔍 除錯：檢查 checkbox 詳細狀態...")
             checkbox = automation.page.locator("input#signup")
+            
+            # 檢查元素是否存在
+            checkbox_count = checkbox.count()
+            print(f"   📊 找到 {checkbox_count} 個符合 'input#signup' 的元素")
+            
+            if checkbox_count > 0:
+                # 使用 JavaScript 檢查元素的詳細屬性
+                checkbox_info = automation.page.evaluate("""
+                    () => {
+                        const cb = document.querySelector('input#signup');
+                        if (!cb) return {exists: false};
+                        
+                        const rect = cb.getBoundingClientRect();
+                        const style = window.getComputedStyle(cb);
+                        
+                        // 檢查是否有覆蓋元素
+                        const elementAtPoint = document.elementFromPoint(
+                            rect.left + rect.width / 2,
+                            rect.top + rect.height / 2
+                        );
+                        
+                        return {
+                            exists: true,
+                            visible: style.display !== 'none' && style.visibility !== 'hidden',
+                            display: style.display,
+                            visibility: style.visibility,
+                            opacity: style.opacity,
+                            disabled: cb.disabled,
+                            checked: cb.checked,
+                            position: {
+                                top: rect.top,
+                                left: rect.left,
+                                width: rect.width,
+                                height: rect.height
+                            },
+                            inViewport: rect.top >= 0 && rect.left >= 0 && 
+                                       rect.bottom <= window.innerHeight && 
+                                       rect.right <= window.innerWidth,
+                            elementAtPoint: elementAtPoint ? elementAtPoint.tagName + (elementAtPoint.id ? '#' + elementAtPoint.id : '') : 'none',
+                            isCovered: elementAtPoint !== cb
+                        };
+                    }
+                """)
+                
+                print(f"   📋 Checkbox 屬性:")
+                print(f"      - 存在: {checkbox_info.get('exists')}")
+                print(f"      - CSS可見: {checkbox_info.get('visible')}")
+                print(f"      - display: {checkbox_info.get('display')}")
+                print(f"      - visibility: {checkbox_info.get('visibility')}")
+                print(f"      - opacity: {checkbox_info.get('opacity')}")
+                print(f"      - disabled: {checkbox_info.get('disabled')}")
+                print(f"      - checked: {checkbox_info.get('checked')}")
+                print(f"      - 位置: {checkbox_info.get('position')}")
+                print(f"      - 在視窗內: {checkbox_info.get('inViewport')}")
+                print(f"      - 中心點元素: {checkbox_info.get('elementAtPoint')}")
+                print(f"      - 被覆蓋: {checkbox_info.get('isCovered')}")
+                
+                # 檢查所有包含 recaptcha 的元素
+                recaptcha_elements = automation.page.evaluate("""
+                    () => {
+                        const allElements = document.querySelectorAll('*');
+                        const recaptchaElements = [];
+                        allElements.forEach(el => {
+                            if (el.className.toLowerCase().includes('recaptcha') || 
+                                el.id.toLowerCase().includes('recaptcha') ||
+                                (el.src && el.src.toLowerCase().includes('recaptcha'))) {
+                                const rect = el.getBoundingClientRect();
+                                recaptchaElements.push({
+                                    tag: el.tagName,
+                                    id: el.id,
+                                    class: el.className,
+                                    display: window.getComputedStyle(el).display,
+                                    visibility: window.getComputedStyle(el).visibility,
+                                    position: {top: rect.top, left: rect.left, width: rect.width, height: rect.height}
+                                });
+                            }
+                        });
+                        return recaptchaElements;
+                    }
+                """)
+                
+                if recaptcha_elements:
+                    print(f"\n   ⚠️  發現 {len(recaptcha_elements)} 個殘留的 reCAPTCHA 元素:")
+                    for i, elem in enumerate(recaptcha_elements, 1):
+                        print(f"      {i}. {elem.get('tag')} id='{elem.get('id')}' class='{elem.get('class')}'")
+                        print(f"         display={elem.get('display')}, visibility={elem.get('visibility')}")
+                else:
+                    print("   ✅ 沒有發現殘留的 reCAPTCHA 元素")
+            
+            # 2. 嘗試勾選 checkbox
+            print("\n📋 步驟 1: 勾選「我已充分閱讀申請事項...」checkbox")
             checkbox.check(timeout=5000)
             print("   ✅ 成功勾選 checkbox")
             

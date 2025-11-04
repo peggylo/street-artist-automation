@@ -515,7 +515,7 @@ If no buses are present (only cars, roads, buildings):
         第 4.5 步實作：支援多個候選選擇器
         
         Returns:
-            bool: 是否成功點擊
+            bool: 是否成功點擊（True=成功，False=找不到按鈕但不是錯誤）
         """
         try:
             print("\n[Verify] 開始尋找 Verify 按鈕...")
@@ -528,7 +528,8 @@ If no buses are present (only cars, roads, buildings):
                     break
             
             if not recaptcha_frame:
-                raise Exception("找不到 reCAPTCHA iframe")
+                print("[Verify] ⚠️  找不到 reCAPTCHA iframe（可能已通過或出現錯誤）")
+                return False
             
             # 嘗試多個選擇器
             for selector in self.config["VERIFY_BUTTON_SELECTORS"]:
@@ -546,11 +547,91 @@ If no buses are present (only cars, roads, buildings):
                 except:
                     continue
             
-            raise Exception("找不到 Verify 按鈕（嘗試了所有選擇器）")
+            print("[Verify] ⚠️  找不到 Verify 按鈕（嘗試了所有選擇器）")
+            return False
             
         except Exception as e:
             print(f"[Verify] ❌ 點擊失敗: {str(e)}")
-            raise
+            return False
+    
+    def check_next_button_exists(self) -> bool:
+        """
+        檢查 Next 按鈕是否存在（manual_next 模式）
+        
+        Returns:
+            bool: True 表示找到 Next 按鈕
+        """
+        try:
+            # 找到 reCAPTCHA iframe
+            recaptcha_frame = None
+            for frame in self.page.frames:
+                if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                    recaptcha_frame = frame
+                    break
+            
+            if not recaptcha_frame:
+                return False
+            
+            # 嘗試多個 Next 按鈕選擇器
+            for selector in self.config["NEXT_BUTTON_SELECTORS"]:
+                try:
+                    button = recaptcha_frame.wait_for_selector(
+                        selector, 
+                        timeout=1000,  # 短暫檢查（1秒）
+                        state="visible"
+                    )
+                    if button and button.is_visible():
+                        print(f"[Next] ✅ 發現 Next 按鈕: {selector}")
+                        return True
+                except:
+                    continue
+            
+            return False
+            
+        except Exception as e:
+            print(f"[Next] ⚠️  檢查 Next 按鈕時發生錯誤: {str(e)}")
+            return False
+    
+    def click_next_button(self) -> bool:
+        """
+        點擊 Next 按鈕（manual_next 模式）
+        
+        Returns:
+            bool: 是否成功點擊
+        """
+        try:
+            print("\n[Next] 開始點擊 Next 按鈕...")
+            
+            # 找到 reCAPTCHA iframe
+            recaptcha_frame = None
+            for frame in self.page.frames:
+                if self.config["RECAPTCHA_IFRAME_PATTERN"] in frame.url.lower():
+                    recaptcha_frame = frame
+                    break
+            
+            if not recaptcha_frame:
+                raise Exception("找不到 reCAPTCHA iframe")
+            
+            # 嘗試多個選擇器
+            for selector in self.config["NEXT_BUTTON_SELECTORS"]:
+                try:
+                    button = recaptcha_frame.wait_for_selector(
+                        selector, 
+                        timeout=2000, 
+                        state="visible"
+                    )
+                    if button and button.is_visible():
+                        button.click()
+                        print(f"[Next] ✅ 成功點擊 Next 按鈕")
+                        return True
+                except:
+                    continue
+            
+            raise Exception("找不到 Next 按鈕（嘗試了所有選擇器）")
+            
+        except Exception as e:
+            print(f"[Next] ❌ 點擊失敗: {str(e)}")
+            return False
     
     def check_recaptcha_passed(self) -> bool:
         """
@@ -806,9 +887,69 @@ If no buses are present (only cars, roads, buildings):
                             tiles[tile_index].click()
                             self.page.wait_for_timeout(int(click_interval * 1000))
                 
+                    # 步驟 5.5: 檢查並點擊 Next 按鈕（manual_next 模式）
+                    print(f"\n[等待] 等待 {self.config['WAIT_FOR_NEXT_BUTTON']} 秒讓 Next 按鈕出現...")
+                    self.page.wait_for_timeout(int(self.config['WAIT_FOR_NEXT_BUTTON'] * 1000))
+                    
+                    next_found = False
+                    next_clicked = False
+                    after_next_status = None
+                    
+                    if self.check_next_button_exists():
+                        next_found = True
+                        print("[模式] 偵測到 manual_next 模式（需要點擊 Next）")
+                        
+                        # 點擊 Next 按鈕
+                        if self.click_next_button():
+                            next_clicked = True
+                            
+                            # 等待處理
+                            wait_after_next = self.config["WAIT_AFTER_NEXT"]
+                            print(f"[等待] 等待 {wait_after_next} 秒讓 Next 處理...")
+                            self.page.wait_for_timeout(int(wait_after_next * 1000))
+                            
+                            # 檢查是否通過（情境 B）
+                            if self.check_recaptcha_passed():
+                                after_next_status = "passed"
+                                print("✅ reCAPTCHA 已通過（點擊 Next 後消失）")
+                                
+                                # 更新 JSON 記錄
+                                if self.screenshot_dir:
+                                    json_data["next_button_found"] = next_found
+                                    json_data["next_button_clicked"] = next_clicked
+                                    json_data["after_next_status"] = after_next_status
+                                    json_data["mode"] = "manual_next"
+                                    json_path = os.path.join(self.screenshot_dir, f"a{attempt_num}_i{iteration}.json")
+                                    with open(json_path, "w", encoding="utf-8") as f:
+                                        json.dump(json_data, f, indent=2, ensure_ascii=False)
+                                
+                                # 成功！返回
+                                print("\n✅ reCAPTCHA 驗證通過！")
+                                return True
+                            else:
+                                after_next_status = "continued"
+                                print("[Next] 繼續下一輪識別...")
+                        else:
+                            # Next 按鈕點擊失敗
+                            print("⚠️  Next 按鈕點擊失敗，繼續流程...")
+                    else:
+                        # 沒有 Next 按鈕，自動提交模式
+                        print("[模式] 偵測到 auto 模式（自動提交）")
+                    
+                    # 更新 JSON 記錄（加入 Next 資訊）
+                    if self.screenshot_dir:
+                        json_data["next_button_found"] = next_found
+                        json_data["next_button_clicked"] = next_clicked
+                        json_data["after_next_status"] = after_next_status
+                        json_data["mode"] = "manual_next" if next_found else "auto"
+                
                     # 步驟 6: 等待圖片更新（點擊後格子會自動更新圖片）
-                    print(f"[等待] 等待 {wait_after_click} 秒讓圖片更新...")
-                    self.page.wait_for_timeout(int(wait_after_click * 1000))
+                    # 如果已經點擊 Next 並等待過，這裡就不用再等了
+                    if not next_clicked:
+                        print(f"[等待] 等待 {wait_after_click} 秒讓圖片更新...")
+                        self.page.wait_for_timeout(int(wait_after_click * 1000))
+                    else:
+                        print(f"[跳過] 已在 Next 後等待過，不重複等待")
                     
                     # 步驟 7: 截圖整頁（點擊後狀態）
                     if self.screenshot_dir:
@@ -823,26 +964,49 @@ If no buses are present (only cars, roads, buildings):
                 
                 # === 提交答案階段 ===
                 print("\n=== 點擊 Verify 提交答案 ===")
-                self.click_verify_button()
+                verify_clicked = self.click_verify_button()
                 
-                # 等待驗證結果
-                print("[等待] 等待 3 秒驗證結果...")
-                self.page.wait_for_timeout(3000)
-                
-                # 檢查驗證是否通過
-                if self.check_recaptcha_passed():
-                    print("\n✅ reCAPTCHA 驗證通過！")
+                if verify_clicked:
+                    # 情境：成功點擊 Verify
+                    # 等待驗證結果
+                    print("[等待] 等待 3 秒驗證結果...")
+                    self.page.wait_for_timeout(3000)
                     
-                    # 最終截圖
-                    if self.screenshot_dir:
-                        self.take_screenshot("5_final_state.png", "最終狀態（驗證通過）")
-                    
-                    print("\n" + "=" * 80)
-                    print("✅ reCAPTCHA 解決流程完成")
-                    print("=" * 80)
-                    return True
+                    # 檢查驗證是否通過
+                    if self.check_recaptcha_passed():
+                        print("\n✅ reCAPTCHA 驗證通過！")
+                        
+                        # 最終截圖
+                        if self.screenshot_dir:
+                            self.take_screenshot("5_final_state.png", "最終狀態（驗證通過）")
+                        
+                        print("\n" + "=" * 80)
+                        print("✅ reCAPTCHA 解決流程完成")
+                        print("=" * 80)
+                        return True
+                    else:
+                        raise Exception("reCAPTCHA 驗證失敗（Verify 後網格仍存在）")
                 else:
-                    raise Exception("reCAPTCHA 驗證失敗（Verify 後網格仍存在）")
+                    # 情境：找不到 Verify 按鈕
+                    print("\n[驗證] 找不到 Verify 按鈕，檢查可能的情境...")
+                    
+                    # 情境 B：reCAPTCHA 已通過
+                    if self.check_recaptcha_passed():
+                        print("✅ 情境 B：reCAPTCHA 已自動通過（Verify 按鈕消失）")
+                        
+                        # 最終截圖
+                        if self.screenshot_dir:
+                            self.take_screenshot("5_final_state.png", "最終狀態（自動通過）")
+                        
+                        print("\n" + "=" * 80)
+                        print("✅ reCAPTCHA 解決流程完成")
+                        print("=" * 80)
+                        return True
+                    
+                    # 情境 C：選擇錯誤（檢查是否有錯誤訊息）
+                    # TODO: 可以在這裡檢查錯誤訊息元素（如 "Try again" 之類的文字）
+                    print("❌ 情境 C：可能選擇錯誤或其他問題")
+                    raise Exception("找不到 Verify 按鈕且 reCAPTCHA 仍存在")
                 
             except Exception as e:
                 error_msg = str(e)
