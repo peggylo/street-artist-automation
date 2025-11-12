@@ -10,6 +10,9 @@ gunicorn==21.2.0
 # Phase 6: 網站自動化 (Playwright)
 playwright==1.40.0
 
+# Phase 6: reCAPTCHA Vision 處理 (OpenAI GPT-4.1)
+openai>=1.0.0
+
 # Google Cloud APIs
 google-cloud-secret-manager==2.16.4
 google-cloud-storage==2.10.0

@@ -1842,30 +1842,56 @@ function copyWordTemplate(applicationData) {
 // =====================================================
 
 /**
- * 每日自動喚醒函數 - 保持服務活躍
- * 防止 GAS 部署因長時間未使用而失效
+ * 每日自動喚醒函數 - 保持服務活躍和授權
+ * 防止 GAS 部署和授權因長時間未使用而失效
  * 
  * 設定方式：
  * 1. GAS 編輯器 → 觸發條件 → 新增觸發條件
  * 2. 函數：dailyKeepAlive
  * 3. 事件來源：時間驅動 → 日計時器
  * 4. 時間：每天上午 8-9 點
+ * 
+ * 關鍵：此函數必須實際調用需要授權的 API（Drive/Sheets），
+ * 才能真正「喚醒」授權，防止授權過期。
  */
 function dailyKeepAlive() {
   try {
     console.log('🔄 每日自動喚醒執行 - ' + new Date());
     
-    // 簡單的操作來保持服務活躍
-    const testData = {
-      timestamp: new Date(),
-      status: 'alive',
-      message: '系統正常運作',
-      version: 'v1.0'
-    };
+    // ===== 關鍵修復：實際調用需要授權的 API =====
     
-    console.log('✅ 喚醒成功:', JSON.stringify(testData));
+    // 1. 測試 Drive 授權（讀取常用影片檔案資訊）
+    try {
+      const videoFileId = CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_ID;
+      const videoFile = DriveApp.getFileById(videoFileId);
+      const videoName = videoFile.getName();
+      console.log('✅ Drive 授權正常 - 常用影片:', videoName);
+    } catch (driveError) {
+      console.error('❌ Drive 授權失敗:', driveError.message);
+      // 不中斷流程，繼續測試其他服務
+    }
     
-    // 可選：檢查重要配置是否存在
+    // 2. 測試 Sheets 授權（讀取申請記錄表格）
+    try {
+      const sheetsId = CONFIG.PHASE4.GOOGLE_SHEETS.APPLICATION_RECORD_ID;
+      const sheet = SpreadsheetApp.openById(sheetsId).getSheetByName(CONFIG.PHASE4.GOOGLE_SHEETS.SHEET_NAME);
+      const lastRow = sheet.getLastRow();
+      console.log('✅ Sheets 授權正常 - 記錄筆數:', lastRow);
+    } catch (sheetsError) {
+      console.error('❌ Sheets 授權失敗:', sheetsError.message);
+      // 不中斷流程
+    }
+    
+    // 3. 測試 PropertiesService 授權
+    try {
+      const properties = PropertiesService.getScriptProperties();
+      const lineToken = properties.getProperty('LINE_ACCESS_TOKEN');
+      console.log('✅ PropertiesService 授權正常 - LINE Token:', lineToken ? '已設定' : '未設定');
+    } catch (propsError) {
+      console.error('❌ PropertiesService 授權失敗:', propsError.message);
+    }
+    
+    // 4. 檢查系統配置
     try {
       validateConfig();
       console.log('✅ 系統配置檢查通過');
@@ -1873,6 +1899,14 @@ function dailyKeepAlive() {
       console.warn('⚠️ 系統配置檢查失敗:', configError.message);
     }
     
+    const testData = {
+      timestamp: new Date(),
+      status: 'alive',
+      message: '系統和授權正常運作',
+      version: 'v1.1 - 修復授權喚醒'
+    };
+    
+    console.log('✅ 喚醒成功:', JSON.stringify(testData));
     return testData;
     
   } catch (error) {
@@ -1922,4 +1956,114 @@ function debugPhaseConfig() {
     phase2_enabled: CONFIG.PHASE2.ENABLE_OPENAI,
     phase3_enabled: CONFIG.PHASE3.ENABLE_STATE_MANAGEMENT
   };
+}
+
+/**
+ * 🔍 診斷授權狀態
+ * 用於確認當前 GAS 的授權狀態和問題
+ */
+function diagnoseAuthorizationStatus() {
+  console.log('========================================');
+  console.log('🔍 授權狀態診斷');
+  console.log('========================================');
+  
+  const results = {
+    timestamp: new Date(),
+    tests: {}
+  };
+  
+  // 測試 1: DriveApp 授權
+  console.log('\n📁 測試 1: DriveApp 授權');
+  try {
+    const videoFileId = CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_ID;
+    const videoFile = DriveApp.getFileById(videoFileId);
+    const videoName = videoFile.getName();
+    const videoSize = videoFile.getSize();
+    console.log('✅ DriveApp 授權正常');
+    console.log('   - 檔案名稱:', videoName);
+    console.log('   - 檔案大小:', Math.round(videoSize / 1024 / 1024) + ' MB');
+    results.tests.drive = { success: true, fileName: videoName };
+  } catch (error) {
+    console.error('❌ DriveApp 授權失敗:', error.message);
+    results.tests.drive = { success: false, error: error.message };
+  }
+  
+  // 測試 2: SpreadsheetApp 授權
+  console.log('\n📊 測試 2: SpreadsheetApp 授權');
+  try {
+    const sheetsId = CONFIG.PHASE4.GOOGLE_SHEETS.APPLICATION_RECORD_ID;
+    const spreadsheet = SpreadsheetApp.openById(sheetsId);
+    const sheet = spreadsheet.getSheetByName(CONFIG.PHASE4.GOOGLE_SHEETS.SHEET_NAME);
+    const lastRow = sheet.getLastRow();
+    console.log('✅ SpreadsheetApp 授權正常');
+    console.log('   - 試算表名稱:', spreadsheet.getName());
+    console.log('   - 工作表名稱:', sheet.getName());
+    console.log('   - 資料列數:', lastRow);
+    results.tests.sheets = { success: true, lastRow: lastRow };
+  } catch (error) {
+    console.error('❌ SpreadsheetApp 授權失敗:', error.message);
+    results.tests.sheets = { success: false, error: error.message };
+  }
+  
+  // 測試 3: PropertiesService 授權
+  console.log('\n🔑 測試 3: PropertiesService 授權');
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const lineToken = properties.getProperty('LINE_ACCESS_TOKEN');
+    const openaiKey = properties.getProperty('OPENAI_API_KEY');
+    console.log('✅ PropertiesService 授權正常');
+    console.log('   - LINE Token:', lineToken ? '已設定' : '未設定');
+    console.log('   - OpenAI Key:', openaiKey ? '已設定' : '未設定');
+    results.tests.properties = { 
+      success: true, 
+      hasLineToken: !!lineToken,
+      hasOpenAIKey: !!openaiKey
+    };
+  } catch (error) {
+    console.error('❌ PropertiesService 授權失敗:', error.message);
+    results.tests.properties = { success: false, error: error.message };
+  }
+  
+  // 測試 4: UrlFetchApp 授權（測試 Cloud Run 連線）
+  console.log('\n🌐 測試 4: UrlFetchApp 授權');
+  try {
+    const testUrl = 'https://www.google.com';
+    const response = UrlFetchApp.fetch(testUrl, { muteHttpExceptions: true });
+    const statusCode = response.getResponseCode();
+    console.log('✅ UrlFetchApp 授權正常');
+    console.log('   - 測試 URL:', testUrl);
+    console.log('   - 回應狀態:', statusCode);
+    results.tests.urlFetch = { success: true, statusCode: statusCode };
+  } catch (error) {
+    console.error('❌ UrlFetchApp 授權失敗:', error.message);
+    results.tests.urlFetch = { success: false, error: error.message };
+  }
+  
+  // 測試 5: CacheService 授權
+  console.log('\n💾 測試 5: CacheService 授權');
+  try {
+    const cache = CacheService.getScriptCache();
+    const testKey = 'auth_test_' + new Date().getTime();
+    const testValue = 'test_value';
+    cache.put(testKey, testValue, 60);
+    const retrievedValue = cache.get(testKey);
+    console.log('✅ CacheService 授權正常');
+    console.log('   - 寫入測試:', retrievedValue === testValue ? '成功' : '失敗');
+    cache.remove(testKey);
+    results.tests.cache = { success: true };
+  } catch (error) {
+    console.error('❌ CacheService 授權失敗:', error.message);
+    results.tests.cache = { success: false, error: error.message };
+  }
+  
+  console.log('\n========================================');
+  console.log('📋 診斷摘要:');
+  console.log('   - DriveApp:', results.tests.drive.success ? '✅' : '❌');
+  console.log('   - SpreadsheetApp:', results.tests.sheets.success ? '✅' : '❌');
+  console.log('   - PropertiesService:', results.tests.properties.success ? '✅' : '❌');
+  console.log('   - UrlFetchApp:', results.tests.urlFetch.success ? '✅' : '❌');
+  console.log('   - CacheService:', results.tests.cache.success ? '✅' : '❌');
+  console.log('========================================');
+  
+  return results;
 }
