@@ -10,11 +10,14 @@
 
 ## 🎯 方案概述
 
+**使用者**：媽媽透過 VoiceOver 操作
+
 ### 自動化部分（Shortcut）
 1. 從 Google Drive 下載申請 PDF 和街頭藝人證到 iCloud「下載項目」
 2. 自動開啟松菸網站第一頁
 3. 自動點擊「我要申請」進入第二頁
-4. 自動預填個人資料（姓名、電話、信箱）
+4. 自動預填個人資料（硬編碼在 JavaScript 中）
+5. 自動勾選「同意條款」
 
 ### 人工操作部分（媽媽用 VoiceOver）
 1. 上傳申請 PDF（下載項目第一個檔案）
@@ -47,314 +50,429 @@ LINE 發送 Shortcut 啟動連結
 ## 📱 iOS Shortcut 流程
 
 ### Shortcut 名稱
-`街頭藝人申請`
+`松菸申請`
 
 ### 輸入資料（從 LINE 傳入）
-```json
-{
-  "pdf_url": "https://drive.google.com/uc?export=download&id=XXX",
-  "cert_url": "https://drive.google.com/uc?export=download&id=YYY",
-  "name": "羅佩琪",
-  "phone": "0912345678",
-  "email": "example@gmail.com"
-}
-```
+
+**只需傳遞兩個檔案 URL**：
+- `pdf_url`：申請 PDF 的直接下載連結
+- `cert_url`：街頭藝人證的直接下載連結
+
+**個資處理原則**：
+- ✅ 個人資料（姓名、電話、Email）**硬編碼在 Shortcut 的 JavaScript 中**
+- ✅ GAS 不需要傳遞個資
+- ✅ LINE 訊息 URL 中不含個資
+- ✅ 隱私保護最大化：個資只出現在 Shortcut 內部
 
 ### 執行步驟
 
-**步驟 1-7：下載檔案**
-1. 取得捷徑輸入
-2. 從字典取 `pdf_url`
-3. 朗讀：「開始下載申請 PDF」
-4. 取得 URL 內容（下載 PDF）
-5. 設定名稱：`申請表_2025年11月.pdf`
-6. 儲存到 iCloud Drive/Downloads
-7. 朗讀：「PDF 下載完成」
-
-**步驟 8-13：複製街頭藝人證**
-8. 取得捷徑輸入
-9. 從字典取 `cert_url`
-10. 取得 URL 內容（下載證照）
-11. 設定名稱：`街頭藝人證.jpg`
-12. 儲存到 iCloud Drive/Downloads
-13. 朗讀：「街頭藝人證已準備完成」
-
-**步驟 14-16：開啟網站**
-14. 朗讀：「即將開啟申請網站」
-15. 等待 2 秒
-16. 開啟 URL：`https://www.songshanculturalpark.org/solicitation`
-
-**步驟 17-18：點擊申請按鈕**
-17. 等待 2 秒（第一頁載入）
-18. 在網頁上執行 JavaScript（點擊「我要申請」）
-
-**步驟 19-23：預填表單並勾選同意**
-19. 等待 4 秒（第二頁載入）
-20. 取得捷徑輸入
-21. 從字典取 `name`, `phone`, `email`
-22. 在網頁上執行 JavaScript（填寫表單 + 勾選同意條款）
-23. 朗讀：「個人資料已填寫完成，同意條款已勾選」
-
-**步驟 24：語音指引**
-24. 朗讀：「接下來請你完成以下步驟。第一，上傳申請 PDF，檔案在下載項目的第一個。第二，上傳街頭藝人證，檔案在下載項目的第二個。第三，勾選我不是機器人。第四，點擊確認送出。祝你順利完成申請！」
+按照以下順序建立 Shortcut 動作：
 
 ---
 
-## 🔧 JavaScript 腳本
+#### 第一段：下載申請 PDF
 
-### 腳本 1：點擊「我要申請」
-
-```javascript
-(function() {
-  try {
-    const links = Array.from(document.querySelectorAll('a'));
-    const applyBtn = links.find(btn => {
-      const container = btn.closest('div');
-      if (!container) return false;
-      const btnText = btn.textContent || '';
-      const containerText = container.textContent || '';
-      return btnText.includes('我要申請') && 
-             containerText.includes('街頭藝人') &&
-             (containerText.includes('展演申請') || containerText.includes('申請'));
-    });
-    if (applyBtn) {
-      applyBtn.click();
-      return 'success';
-    } else {
-      return 'error: 找不到申請按鈕';
-    }
-  } catch (e) {
-    return 'error: ' + e.message;
-  }
-})();
-```
-
-### 腳本 2：預填表單並勾選同意條款
-
-```javascript
-(function() {
-  try {
-    const nameInput = document.querySelector('input[placeholder*="姓名"]');
-    if (!nameInput) return 'error: 表單尚未載入';
-    
-    const phoneInput = document.querySelector('input[placeholder*="手機"]');
-    const emailInput = document.querySelector('input[type="email"]');
-    
-    // 填寫個人資料（從 Shortcut 傳入的值）
-    if (nameInput) nameInput.value = "羅佩琪";
-    if (phoneInput) phoneInput.value = "0912345678";
-    if (emailInput) emailInput.value = "example@gmail.com";
-    
-    // 勾選同意條款 checkbox
-    const agreementCheckbox = document.querySelector('input#signup');
-    if (agreementCheckbox && !agreementCheckbox.checked) {
-      agreementCheckbox.click();
-    }
-    
-    return 'success: 已填寫完成並勾選同意條款';
-  } catch (e) {
-    return 'error: ' + e.message;
-  }
-})();
-```
+1. 新增動作：**取得捷徑輸入**
+2. 新增動作：**從字典取得值**
+   - 鍵值：`pdf_url`
+3. 新增動作：**取得 URL 的內容**
+   - 輸入：選擇上一步的結果
+4. 新增動作：**儲存檔案**
+   - 位置：iCloud Drive/Downloads
+   - 詢問儲存位置：關閉
+   - 覆寫已存在檔案：開啟
+5. 新增動作：**朗讀文字**
+   - 文字：`申請表儲存完成`
 
 ---
 
-## 💻 GAS 程式碼修改
+#### 第二段：下載街頭藝人證
 
-### 新增函數：發送 Shortcut 連結
-
-```javascript
-function sendShortcutLinkToLine(applicationData, pdfFileId, certFileId) {
-  // 1. 設定檔案權限為公開
-  setFilePublicPermission(pdfFileId);
-  setFilePublicPermission(certFileId);
-  
-  // 2. 產生直接下載連結
-  const pdfUrl = `https://drive.google.com/uc?export=download&id=${pdfFileId}`;
-  const certUrl = `https://drive.google.com/uc?export=download&id=${certFileId}`;
-  
-  // 3. 組合 Shortcut 資料
-  const shortcutInput = {
-    pdf_url: pdfUrl,
-    cert_url: certUrl,
-    name: "羅佩琪",
-    phone: "0912345678",
-    email: "example@gmail.com"
-  };
-  
-  // 4. 產生 Shortcut URL
-  const shortcutUrl = 'shortcuts://run-shortcut?name=' + 
-                      encodeURIComponent('街頭藝人申請') + 
-                      '&input=' + 
-                      encodeURIComponent(JSON.stringify(shortcutInput));
-  
-  // 5. 發送 LINE 訊息
-  const message = {
-    type: 'text',
-    text: `✅ ${applicationData.month}申請檔案已準備完成\n\n` +
-          `📅 日期：${applicationData.selected_dates.join(', ')}\n` +
-          `📄 PDF 已生成\n` +
-          `🏆 街頭藝人證已備妥\n\n` +
-          `👇 點擊下方按鈕開始申請`,
-    quickReply: {
-      items: [{
-        type: 'action',
-        action: {
-          type: 'uri',
-          label: '🚀 開始申請',
-          uri: shortcutUrl
-        }
-      }]
-    }
-  };
-  
-  LineHandler.pushMessage(Config.LINE_GROUP_ID, message);
-}
-
-function setFilePublicPermission(fileId) {
-  /**
-   * 設定 Google Drive 檔案權限：知道連結的任何人可檢視
-   */
-  try {
-    Drive.Permissions.insert({
-      role: 'reader',
-      type: 'anyone'
-    }, fileId);
-    console.log(`✅ 檔案 ${fileId} 權限已設為公開`);
-  } catch (e) {
-    console.error(`❌ 設定檔案權限失敗: ${e.message}`);
-  }
-}
-```
-
-### 呼叫時機
-
-在 Cloud Run 處理完成、PDF 生成後呼叫：
-
-```javascript
-// 在 main.py 回傳成功後
-const cloudRunResponse = callCloudRunForDocumentProcessing(...);
-
-if (cloudRunResponse.status === 'success') {
-  sendShortcutLinkToLine(
-    applicationData, 
-    cloudRunResponse.pdf_file_id,
-    Config.CERTIFICATE.FILE_ID
-  );
-}
-```
+1. 新增動作：**取得捷徑輸入**
+2. 新增動作：**從字典取得值**
+   - 鍵值：`cert_url`
+3. 新增動作：**取得 URL 的內容**
+   - 輸入：選擇上一步的結果
+4. 新增動作：**儲存檔案**
+   - 位置：iCloud Drive/Downloads
+   - 詢問儲存位置：關閉
+   - 覆寫已存在檔案：開啟
+5. 新增動作：**朗讀文字**
+   - 文字：`藝人證儲存完成`
 
 ---
 
-## 🔑 關鍵技術細節
+#### 第三段：開啟松菸網站
 
-### Google Drive 下載
+1. 新增動作：**開啟 URL**
+   - URL：`https://www.songshanculturalpark.org/solicitation`
+2. 新增動作：**等待**
+   - 時間：2 秒
+3. 新增動作：**朗讀文字**
+   - 文字：`已開啟網站`
 
-**不需要 Google Drive App**
-- 使用直接下載連結：`https://drive.google.com/uc?export=download&id=FILE_ID`
-- Shortcut 的「取得 URL 內容」動作直接下載
-- 背景執行，不開啟瀏覽器
+---
 
-**檔案權限設定**
+#### 第四段：點擊申請按鈕
+
+1. 新增動作：**等待**
+   - 時間：2 秒
+2. 新增動作：**在網頁上執行 JavaScript**
+   - JavaScript：自動尋找並點擊「我要申請」按鈕
+   - 功能：查詢包含「我要申請」和「街頭藝人」的連結並點擊
+
+---
+
+#### 第五段：預填表單並勾選同意
+
+1. 新增動作：**等待**
+   - 時間：4 秒
+2. 新增動作：**在網頁上執行 JavaScript**
+   - JavaScript：填寫表單欄位並勾選同意條款
+   - 功能：
+     - 填寫姓名、手機、Email（硬編碼值）
+     - 勾選同意條款 checkbox
+3. 新增動作：**朗讀文字**
+   - 文字：`基本資料填好了`
+
+---
+
+#### 第六段：人工操作語音指引
+
+1. 新增動作：**朗讀文字**
+   - 文字：`現在交給老媽接手`
+
+---
+
+## 🔧 技術實作要點
+
+### 1. Google Drive 下載機制
+
+**直接下載 URL 格式**：
+```
+https://drive.google.com/uc?export=download&id=FILE_ID
+```
+
+**檔案權限設定**：
+- GAS 使用 `Drive.Permissions.insert()` 設定為公開
 - 類型：`anyone`（任何人）
 - 角色：`reader`（唯讀）
-- 結果：知道連結的任何人可檢視
 
-### Shortcut 等待時間
+**優點**：
+- 不需要 Google Drive App
+- Shortcut 背景下載，不開啟瀏覽器
+- 直接儲存到 iCloud Drive
 
-- 第一頁載入：2 秒
-- 第二頁載入：4 秒
-- 總等待：6 秒（足夠 99% 情況）
+### 2. JavaScript 自動化
 
-### VoiceOver 相容性
+**腳本 1：點擊「我要申請」**
+- 查詢所有 `<a>` 連結
+- 找到同時包含「我要申請」和「街頭藝人」的按鈕
+- 執行點擊
 
-- ✅ LINE 訊息和按鈕：完全支援
-- ✅ Shortcut 語音提示：與 VoiceOver 相容
-- ✅ Safari 表單操作：完全支援
+**腳本 2：預填表單並勾選同意**
+- 使用 `input[placeholder*="姓名"]` 等選擇器
+- 填入硬編碼的個人資料
+- 勾選 `input#signup` 同意條款 checkbox
+
+**錯誤處理**：
+- 如果找不到元素，回傳錯誤訊息
+- Shortcut 會朗讀錯誤
+- 媽媽可以手動操作
+
+### 3. GAS 整合
+
+**新增函數**：`sendShortcutLinkToLine()`
+
+**功能**：
+1. 設定 PDF 和證照檔案為公開權限
+2. 產生直接下載連結
+3. 組合 Shortcut URL（只包含兩個檔案 URL）
+4. 透過 LINE Push Message 發送快速回覆按鈕
+
+**呼叫時機**：
+- Cloud Run 處理完成後
+- PDF 生成成功時
+- 在現有流程中加入這個步驟
+
+**LINE 訊息格式**：
+- 文字：申請資訊（月份、日期）
+- Quick Reply：「🚀 上網填表」按鈕
+- URI：`shortcuts://run-shortcut?name=松菸申請&input={...}`
 
 ---
 
-## 📝 實作步驟
+## 🔑 關鍵設計決策
 
-### 階段 1：建立 Shortcut（人工）
+### 決策 1：個資硬編碼在 JavaScript
 
-1. 在 iPhone「捷徑」App 中建立新捷徑
-2. 依照上述 24 個步驟加入動作
-3. 複製貼上 JavaScript 腳本
-4. 測試運作
+**理由**：
+- 使用者永遠是同一人
+- 隱私保護：LINE 訊息不含個資
+- 簡化 Shortcut 流程（減少 3-4 步驟）
+- GAS 不需要處理個資
 
-### 階段 2：修改 GAS 程式碼
+**實作方式**：
+- 在 JavaScript 中直接寫入固定值
+- 實際撰寫時從安全位置取得資料
 
-1. 在 `Code.js` 加入 `sendShortcutLinkToLine()` 和 `setFilePublicPermission()`
-2. 在適當位置呼叫（Cloud Run 成功後）
-3. 測試 LINE 訊息發送
+### 決策 2：等待時間設定
 
-### 階段 3：端到端測試
+**第一頁載入**：2 秒
+**第二頁載入**：4 秒
 
-1. LINE 發起申請
-2. 收到 Shortcut 按鈕
-3. 點擊執行 Shortcut
-4. 確認檔案下載成功
-5. 確認網站開啟和預填正常
-6. 手動完成上傳和提交
+**理由**：
+- 足夠 99% 情況使用
+- 如果失敗，語音提示錯誤
+- 媽媽可以手動完成
 
-### 階段 4：給媽媽使用
+### 決策 3：VoiceOver 相容性優先
 
-1. 分享 Shortcut 給媽媽（iCloud 連結或 .shortcut 檔案）
-2. 教導操作流程
-3. 陪同完成第一次申請
-4. 收集反饋並優化
+**所有語音提示**：
+- 使用「朗讀文字」動作
+- 簡潔明確（如「申請表儲存完成」而非「正在儲存...」）
+- 重要節點才提示（下載完成、網站開啟、資料填好）
+- 與 VoiceOver 不衝突
+
+**檔案順序**：
+- 確保 PDF 先下載（第一個）
+- 證照後下載（第二個）
+- 符合「下載項目」順序，方便媽媽上傳
+
+---
+
+## 📝 實作步驟（漸進式開發）
+
+### 階段 0：準備測試環境（5 分鐘）
+
+**目的**：驗證 Google Drive 直接下載機制
+
+**步驟**：
+1. 手動上傳測試 PDF 到 Google Drive
+2. 設定為「知道連結的任何人」
+3. 組合直接下載連結
+4. 在 iPhone Safari 測試是否能下載
+
+**驗收標準**：
+- [ ] Safari 直接下載檔案
+- [ ] 不需要 Google Drive App
+
+---
+
+### 階段 1：簡單 Shortcut 測試下載（15 分鐘）
+
+**目的**：驗證 Shortcut 下載功能
+
+**建立簡化測試版**：
+- 只實作「第一段：下載申請 PDF」
+- 暫時用固定 URL 測試（不需要輸入參數）
+
+**測試方式**：
+- 直接執行 Shortcut
+- 確認檔案出現在 iCloud Drive/Downloads
+
+**驗收標準**：
+- [ ] Shortcut 執行成功
+- [ ] 檔案成功下載到指定位置
+- [ ] 聽到語音提示「申請表儲存完成」
+
+---
+
+### 階段 2：雙檔案下載（10 分鐘）
+
+**目的**：確保兩個檔案下載和順序正確
+
+**擴充 Shortcut**：
+- 實作「第一段：下載申請 PDF」
+- 實作「第二段：下載街頭藝人證」
+- 開始使用捷徑輸入參數（傳入兩個 URL）
+
+**驗收標準**：
+- [ ] 兩個檔案都成功下載
+- [ ] 在「檔案」App 中，PDF 在證照之前
+- [ ] 聽到兩次語音提示（申請表、藝人證）
+
+---
+
+### 階段 3：GAS 發送連結（20 分鐘）
+
+**目的**：確保 LINE 訊息和連結格式正確
+
+**實作重點**：
+1. 加入 `setFilePublicPermission()` 函數
+2. 加入測試函數 `testSendShortcutLink()`
+3. 在 GAS 執行測試
+
+**驗收標準**：
+- [ ] LINE 收到按鈕
+- [ ] 點擊後啟動 Shortcut
+- [ ] 檔案成功下載
+
+---
+
+### 階段 4：網站導航（20 分鐘）
+
+**目的**：測試開啟網站和點擊申請按鈕
+
+**擴充 Shortcut**：
+- 實作「第三段：開啟松菸網站」
+- 實作「第四段：點擊申請按鈕」
+- 撰寫第一個 JavaScript：自動點擊「我要申請」
+
+**驗收標準**：
+- [ ] Safari 自動開啟松菸網站
+- [ ] 聽到「已開啟網站」
+- [ ] 自動點擊進入表單頁
+
+---
+
+### 階段 5：完整 Shortcut（20 分鐘）
+
+**目的**：完成所有自動化功能
+
+**擴充 Shortcut**：
+- 實作「第五段：預填表單並勾選同意」
+- 實作「第六段：人工操作語音指引」
+- 撰寫第二個 JavaScript：預填表單 + 勾選同意
+
+**驗收標準**：
+- [ ] 檔案下載成功
+- [ ] 網站自動導航
+- [ ] 表單自動預填（姓名、手機、Email）
+- [ ] 同意條款自動勾選
+- [ ] 聽到「基本資料填好了」
+- [ ] 聽到「現在交給老媽接手」
+
+---
+
+### 階段 6：GAS 整合真實流程（30 分鐘）
+
+**目的**：連接完整申請流程
+
+**實作重點**：
+- 加入正式 `sendShortcutLinkToLine()` 函數
+- 在 Cloud Run 回調成功後呼叫
+- 使用真實的 PDF 和證照檔案
+- 確認 Shortcut 名稱為「松菸申請」
+
+**驗收標準**：
+- [ ] LINE 申請後收到「🚀 上網填表」按鈕
+- [ ] 按鈕包含真實的 PDF 和證照 URL
+- [ ] 點擊後啟動「松菸申請」Shortcut
+- [ ] 完整流程順利執行
+
+---
+
+### 階段 7：端到端測試（30 分鐘）
+
+**目的**：完整流程驗證
+
+**測試流程**：
+1. 在 LINE 發起真實申請
+2. 選擇日期和影片
+3. 等待 Cloud Run 處理
+4. 收到 Shortcut 按鈕
+5. 點擊執行 Shortcut
+6. 確認所有自動化步驟
+7. 手動完成上傳和提交
+8. 確認申請成功
+
+**驗收標準**：
+- [ ] 完整流程順暢
+- [ ] 操作時間 < 5 分鐘
+- [ ] 申請成功提交
+
+---
+
+### 階段 8：交付使用（1 小時）
+
+**目的**：實際交付使用並優化
+
+**8.1 分享 Shortcut**：
+1. 長按 Shortcut → 分享
+2. 複製 iCloud 連結
+3. 傳給媽媽匯入
+
+**8.2 教學和陪同**：
+1. 說明完整流程
+2. 陪同完成第一次申請
+3. 記錄遇到的問題
+4. 調整語音提示或流程
+
+**8.3 收集反饋**：
+- VoiceOver 體驗如何？
+- 語音提示是否清楚？
+- 操作時間是否可接受？
+- 哪些步驟需要優化？
+
+**驗收標準**：
+- [ ] 媽媽能獨立完成申請
+- [ ] 操作時間 < 5 分鐘
+- [ ] 成功率 > 90%
 
 ---
 
 ## ⚠️ 注意事項
 
 ### 檔案順序
-
-媽媽上傳檔案時，確保檔案順序：
-1. 第一個：申請表 PDF（最新下載）
-2. 第二個：街頭藝人證（次新）
+- 確保 PDF 第一個下載（最新）
+- 證照第二個下載（次新）
+- 媽媽上傳時按照「下載項目」順序
 
 ### JavaScript 失敗處理
-
-如果等待時間不夠，JavaScript 可能失敗：
-- Shortcut 會朗讀錯誤訊息
-- 媽媽可以手動操作（表單欄位、點擊申請按鈕）
+- 如果等待時間不夠，會朗讀錯誤
+- 媽媽可以手動填寫表單
+- 不影響整體流程
 
 ### 網站改版
-
-如果松菸網站改版，選擇器可能失效：
-- 需要更新 JavaScript 腳本
+- 如果松菸網站改版，選擇器可能失效
+- 需要更新 JavaScript 腳本中的選擇器
 - 短期內可以完全人工操作
+
+### Shortcut 維護
+- JavaScript 腳本在 Shortcut 中修改
+- 選擇器失效時更新
+- 語音提示文字可隨時調整
 
 ---
 
 ## 📊 優缺點評估
 
 ### 優點
-- ✅ 繞過 reCAPTCHA 圖片驗證問題
-- ✅ 善用媽媽的 VoiceOver 能力
-- ✅ 大部分流程自動化（個人資料 + 同意條款）
-- ✅ 媽媽只需操作 2-3 分鐘（只需上傳檔案 + 勾 reCAPTCHA）
+- ✅ 完全繞過 reCAPTCHA 圖片驗證問題
+- ✅ 善用媽媽的 VoiceOver 操作能力
+- ✅ 大部分流程自動化（下載、導航、預填）
+- ✅ 媽媽只需操作 2-3 分鐘
 - ✅ 不需要複雜的 Vision API
+- ✅ LINE 訊息不含個資，隱私保護佳
 
 ### 缺點
 - ⚠️ 需要媽媽手動操作（但可接受）
 - ⚠️ 需要建立和維護 Shortcut
 - ⚠️ 網站改版需要更新腳本
+- ⚠️ 只支援 iOS 平台
 
 ---
 
 ## 🎯 成功標準
 
-1. 媽媽能獨立完成申請（成功率 > 90%）
-2. 操作時間 < 5 分鐘
-3. VoiceOver 體驗流暢
-4. 語音提示清楚明確
+1. **可用性**：媽媽能獨立完成申請（成功率 > 90%）
+2. **效率性**：操作時間 < 5 分鐘
+3. **無障礙性**：VoiceOver 體驗流暢
+4. **易理解性**：語音提示清楚明確
 
 ---
 
+## 📝 文件資訊
+
 **建立日期**：2025年11月12日  
+**最後更新**：2025年11月15日  
+**文件定位**：最上位開發指引  
 **當前狀態**：規劃階段，待實作
 
+**技術細節**：
+- 具體程式碼實作請參考各模組的程式檔案
+- 此文件聚焦於策略、流程、決策說明
+- 開發時以實際程式碼為準
+
+---
