@@ -23,6 +23,10 @@ code/cloud-run/config.py
 templates/*.docx
 templates/*.doc
 
+# Bookmarklet（包含個資）
+songshan-bookmarklet.js
+songshan-bookmarklet-minified.txt
+
 # 申請相關資料夾（包含個資和生成文件）
 系統記錄/
 申請截圖/
