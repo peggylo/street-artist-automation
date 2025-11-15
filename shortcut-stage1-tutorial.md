@@ -54,11 +54,10 @@
 1. 滑到最下方，點擊搜尋框
 2. 搜尋：`文字`
 3. 點選「文字」動作
-4. 在文字框中輸入以下連結（完整複製）：
+4. 在文字框中輸入**街頭藝人證圖片的 Google Drive 直接下載連結**
 
-```
-https://drive.google.com/uc?export=download&id=***REMOVED***
-```
+> **格式**：`https://drive.google.com/uc?export=download&id=FILE_ID`  
+> **說明**：將實際的檔案 ID 替換 `FILE_ID`
 
 ---
 

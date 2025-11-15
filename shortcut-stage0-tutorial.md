@@ -39,11 +39,10 @@
 1. 點擊下方搜尋框
 2. 搜尋：`文字`
 3. 點選「文字」動作（藍色圖示）
-4. 在出現的文字框中，輸入以下連結（完整複製）：
+4. 在出現的文字框中，輸入**申請 PDF 的 Google Drive 直接下載連結**
 
-```
-https://drive.google.com/uc?export=download&id=***REMOVED***
-```
+> **格式**：`https://drive.google.com/uc?export=download&id=FILE_ID`  
+> **說明**：將實際的檔案 ID 替換 `FILE_ID`
 
 ---
 
