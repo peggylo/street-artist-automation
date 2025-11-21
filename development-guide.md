@@ -714,6 +714,17 @@ K. 處理完成時間 (空白，Phase 5 填入)
 - **用戶測試**：實際使用驗證和優化
 - **上線準備**：生產環境部署
 
+#### ⚠️ 重要變更說明（2025年11月）
+
+**問題**：Phase 6 階段 2B 完成後，發現 Cloud Run 無頭模式在松菸網站 100% 觸發 reCAPTCHA 圖片驗證，Playwright 自動化方案無法穩定處理。
+
+**解決方案**：改採 **iOS Shortcut + Safari Bookmarklet 半自動化方案**，詳見 [iOS Shortcut 解決方案](ios-shortcut-solution.md)。
+
+**影響範圍**：
+- Phase 6 階段 2C（真實提交測試）改為實作 iOS Shortcut 整合
+- Cloud Run Playwright 自動化保留作為技術參考，暫不繼續開發
+- 完整流程改為：LINE 申請 → PDF 生成 → iOS Shortcut 下載 → Bookmarklet 填表 → 人工提交
+
 #### 🎯 Phase 6 開發決策（2025年9月）
 
 **架構決策**：
@@ -853,10 +864,12 @@ gcloud run services update document-processor \
 - ✅ 錯誤處理和回調機制運作
 - ✅ **停在提交前，不按送出按鈕**
 
-### **階段2C：真實提交測試**
-**執行方式**：LINE申請觸發，真實提交
-**測試範圍**：完整流程含真實提交
-**成功標準**：
+### **階段2C：真實提交測試** ⚠️ **已改採 iOS Shortcut 方案**
+**原計劃**：LINE申請觸發，Playwright 自動化真實提交
+**變更原因**：reCAPTCHA 圖片驗證問題無法解決（詳見上方「重要變更說明」）
+**新方案**：改為實作 iOS Shortcut + Bookmarklet 半自動化方案（詳見 [iOS Shortcut 解決方案](ios-shortcut-solution.md)）
+
+**原成功標準**（保留作為參考）：
 - ✅ 真的按下「確認送出」按鈕
 - ✅ 截圖「提交成功」頁面並存入Google Drive
 - ✅ 狀態更新為「完成」
@@ -1058,9 +1071,9 @@ N. 失敗截圖連結    → 失敗點的截圖Google Drive連結
 - **未來優化**：可在階段 2C 後評估是否需要實作
 
 **當前狀態**：
-- ⏸️ 停在提交前（階段 2B）
-- ✅ 準備進入階段 2C（真實提交）
-- ⚠️ reCAPTCHA 圖片驗證待優化（詳見 [reCAPTCHA 解決方案](recaptcha-solution.md)）
+- ⏸️ Playwright 自動化方案暫停（階段 2B 完成，階段 2C 因 reCAPTCHA 問題改採新方案）
+- ✅ 改採 iOS Shortcut + Bookmarklet 半自動化方案（詳見 [iOS Shortcut 解決方案](ios-shortcut-solution.md)）
+- 📝 Cloud Run Playwright 程式碼保留作為技術參考
 
 ---
 

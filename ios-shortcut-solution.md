@@ -195,14 +195,16 @@ if (在表單頁) {
 - **測試**：完整流程 LINE 申請 → PDF 生成 → 收到按鈕 → 點擊啟動 Shortcut
 
 #### 關鍵決策
-- **Phase 6 停用**：`Config.js` 設定 `ENABLE_WEBSITE_AUTOMATION: false`（保留程式碼供未來使用）
-- **Cloud Run 回調**：PDF 生成完成後立即回調 GAS（不等網站自動化），回調資料包含 `pdf_file_id`
+- **Phase 6 停用**：`Config.js` 設定 `ENABLE_WEBSITE_AUTOMATION: false`（網站自動化確定失敗，改用 Shortcut 半自動方案）
+- **Cloud Run 回調**：PDF 生成完成後立即回調 GAS（跳過網站自動化），回調資料只包含 `pdf_file_id`（不傳 URL）
 - **LINE 訊息格式**：Template Message (Buttons)，VoiceOver 友善且支援 URI action
-- **訊息內容**：「我幫你寫好申請表了，請點擊下面按鈕取得申請書」+ 按鈕「請按我」
+  - 訊息內容：「我幫你寫好申請表了，請點擊下面按鈕取得申請書」
+  - 按鈕文字：「取得申請書」（VoiceOver 會念「取得申請書 按鈕」）
+  - altText：「申請表已準備好，請點擊按鈕繼續」（通知欄顯示，收到通知時 VoiceOver 會念）
 - **PDF 權限設定**：GAS 收到回調後執行 `setFilePublic(pdf_file_id)`，由 GAS 統一管理 Drive 權限
-- **Shortcut URL 格式**：`shortcuts://run-shortcut?name={shortcut_name}&input=text&text={file_url}`
-  - 實際 Shortcut 名稱：見 `Config.js` 設定
-  - `file_url` 為 Google Drive 直接下載連結
+- **Shortcut URL 格式**：`shortcuts://run-shortcut?name=松菸申請&input=text&text={download_url}`
+  - `download_url` = `https://drive.google.com/uc?export=download&id={pdf_file_id}`
+  - 只需傳遞 file ID，由 GAS 組合成下載連結
 - **錯誤處理**：失敗時不發送按鈕，只發送錯誤訊息
 - **證照檔案**：不處理（已固定在 Shortcut 中）
 - **檔案結構**：依職責分散到 Config/LineHandler/Code（不獨立成新檔案）
