@@ -169,12 +169,37 @@ if (在表單頁) {
   - 方法2：用 LINE 傳送測試 URL 給自己
 - **重要發現**：Google Drive 中文檔名會產生 UTF-8 亂碼，需在 Shortcut 中手動設定檔名（使用當前日期時間）
 
-### 階段 5：GAS 整合（待實作）
-- 新增 GAS 函數：`sendShortcutLinkToLine(userId, pdfFileId)`
-- 設定 PDF 檔案公開權限（`anyone with link` = `reader`）
-- **一次性設定**：將證照檔案也設為公開，取得固定 URL
-- 透過 LINE 發送 Shortcut 按鈕（Quick Reply + URI Action）
-- **Note**：階段4完成後即可進行，不需要等其他階段
+### 階段 5：GAS 整合
+
+#### 開發步驟（每步可測試）
+
+**步驟1：基礎設定與工具函數**
+- Config.js：新增 `SHORTCUT` 配置（NAME, BASE_URL, DRIVE_DOWNLOAD_BASE）
+- Code.js：新增 `setFilePublic(fileId)` + `buildShortcutUrl(pdfFileId)`
+- **測試**：手動執行函數，確認 Drive 權限變更 + console.log URL 格式正確
+
+**步驟2：LINE 按鈕功能**
+- LineHandler.js：新增 `sendShortcutMessage(to, shortcutUrl)`
+  - 訊息：「我幫你寫好申請表了，請點擊下面按鈕取得申請書」
+  - 按鈕：「請按我」（uri action）
+- **測試**：手動呼叫發送測試 URL，LINE 收到按鈕且可啟動 Shortcut
+
+**步驟3：GAS 回調整合**
+- Code.js：修改 `handleCloudRunCallback()`
+  - 成功時：setFilePublic → buildShortcutUrl → sendShortcutMessage
+  - 失敗時：只發送錯誤訊息（不含按鈕）
+- **測試**：手動呼叫回調函數模擬 Cloud Run 回應，驗證完整流程
+
+**步驟4：Cloud Run 修改與端到端測試**
+- main.py：回調資料加入 `pdf_file_id` 欄位
+- **測試**：完整流程 LINE 申請 → PDF 生成 → 收到按鈕 → 點擊啟動 Shortcut
+
+#### 關鍵決策
+- **訊息簡化**：「我幫你寫好申請表了，請點擊下面按鈕取得申請書」+ 按鈕「請按我」
+- **PDF 權限**：維持資料夾公開（依賴 File ID 隨機性，暫不實作限時公開）
+- **錯誤處理**：失敗時不發送按鈕，只發送錯誤訊息
+- **證照檔案**：不處理（已固定在 Shortcut 中）
+- **檔案結構**：依職責分散到 Config/LineHandler/Code（不獨立成新檔案）
 
 ### 階段 6：端到端測試（待實作）
 - LINE 申請 → Shortcut → Bookmarklet → 送出
