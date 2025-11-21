@@ -11,9 +11,10 @@
 ## 🎯 方案概述
 
 ### Shortcut 負責（自動）
-1. 從 Google Drive 下載申請 PDF 和街頭藝人證到 iCloud Drive
-2. 開啟松菸網站首頁
-3. 語音提示媽媽點擊書籤
+1. 從 Google Drive 下載申請 PDF 到 iCloud Drive
+2. 從 Google Drive 下載街頭藝人證到 iCloud Drive（證照 URL 固定在 Shortcut 中）
+3. 開啟松菸網站首頁
+4. 語音提示媽媽點擊書籤
 
 ### Bookmarklet 負責（點兩次）
 1. **第一次點擊**：自動導航到街頭藝人申請表單頁
@@ -54,13 +55,18 @@ LINE 發送 Shortcut 按鈕
 ### Shortcut 名稱
 `松菸申請`
 
-### 核心動作（13 個）
-1-5. 下載 PDF 到 iCloud Drive
-6-10. 下載證照到 iCloud Drive  
-11. 開啟松菸網站首頁
-12-13. 語音提示「請點擊松菸申請書籤」
+### 核心動作（約 10-12 個）
+1. **取得捷徑輸入**：從 LINE 接收 PDF URL
+2-5. 下載 PDF 到 iCloud Drive（URL 動態，手動設定檔名避免中文亂碼）
+6-9. 下載證照到 iCloud Drive（URL 固定，已寫入 Shortcut）
+10. 開啟松菸網站首頁
+11-12. 語音提示「請點擊松菸申請書籤」
 
-**重點**：不使用「在網頁上執行 JavaScript」動作（iOS 限制）
+**重點**：
+- 證照 URL **不由 LINE 傳入**，直接寫死在 Shortcut 中
+- 證照和 PDF 都從 **Google Drive** 下載
+- 只有 PDF URL 是動態的，從 LINE 傳入
+- **檔名處理**：因 Google Drive 中文檔名會亂碼，需在 Shortcut 手動設定檔名（格式：`申請表_yyyy年MM月_MMdd_HHmm.pdf`）
 
 ---
 
@@ -87,9 +93,10 @@ if (在表單頁) {
 ## 🔧 技術實作要點
 
 ### 1. Google Drive 下載
-- GAS 設定檔案為公開（`anyone`, `reader`）
+- GAS 設定 PDF 檔案為公開（`anyone with link` = `reader`）
+- **證照檔案也需設為公開**（一次設定，永久有效）
 - 使用直接下載 URL：`https://drive.google.com/uc?export=download&id=FILE_ID`
-- Shortcut 背景下載到 iCloud Drive
+- Shortcut 背景下載 PDF 和證照到 iCloud Drive
 
 ### 2. Bookmarklet 關鍵技術
 - 使用 `.row_rt` 選擇器找計畫區塊
@@ -98,9 +105,10 @@ if (在表單頁) {
 
 ### 3. GAS 整合
 - 函數：`sendShortcutLinkToLine()`
-- 傳送兩個檔案 URL 給 Shortcut
+- 只傳送 PDF URL 給 Shortcut（證照 Google Drive URL 已固定在 Shortcut 中）
 - LINE Quick Reply 按鈕：「🚀 上網填表」
-- URI：`shortcuts://run-shortcut?name=松菸申請&input={pdf_url, cert_url}`
+- URI：`shortcuts://run-shortcut?name=松菸申請&input=text&text={pdf_url}`
+- **證照設定**：需一次性將證照檔案設為公開，URL 固定後寫入 Shortcut
 
 ---
 
@@ -111,10 +119,11 @@ if (在表單頁) {
 - 改用 Safari Bookmarklet（點兩次）
 - 好處：可靠性高、容易除錯、可獨立測試
 
-### 決策 2：個資硬編碼在 Bookmarklet
-- 使用者永遠是同一人
-- LINE 訊息不含個資
-- 簡化流程
+### 決策 2：個資與證照固定化
+- **個資硬編碼在 Bookmarklet**：使用者永遠是同一人
+- **證照 URL 固定在 Shortcut**：街頭藝人證不會變更，Google Drive URL 寫死在 Shortcut
+- **只傳遞 PDF URL**：LINE 訊息只含當次申請的 PDF 連結
+- 簡化流程，減少傳輸資料
 
 ### 決策 3：智能書籤（單一書籤兩個功能）
 - 自動判斷當前頁面（首頁 vs 表單頁）
@@ -131,10 +140,12 @@ if (在表單頁) {
 - 教學文件：`shortcut-stage0-tutorial.md`
 
 ### 階段 1：雙檔下載測試 ✅
-- 擴充至 10 個動作
-- 下載 PDF + 證照圖片
+- 擴充至約 10 個動作
+- 下載 PDF（動態）+ 下載證照（固定 URL）
+- 兩個檔案都從 Google Drive 下載到 iCloud Drive
 - 確認檔案順序正確
 - 教學文件：`shortcut-stage1-tutorial.md`
+- **Note**：此階段兩個 URL 都是硬編碼測試
 
 ### 階段 2：網站開啟測試 ✅
 - 新增「開啟 URL」動作
@@ -149,14 +160,21 @@ if (在表單頁) {
 - 使用說明（`bookmarklet-使用說明.md`）
 - 功能：自動判斷頁面 + 導航/填表
 
-### 階段 4：參數化改造（待實作）
-- Shortcut 改用「取得捷徑輸入」
-- 從 LINE 動態傳入 `pdf_url` 和 `cert_url`
+### 階段 4：參數化改造 ✅
+- Shortcut 改用「取得捷徑輸入」接收動態 PDF URL
+- 從 LINE 動態傳入 `pdf_url`
+- **證照 URL 保持固定**：Google Drive URL 不由 LINE 傳入，直接寫在 Shortcut 中
+- **驗收方式**：
+  - 方法1：手動構造 Shortcut URL 測試
+  - 方法2：用 LINE 傳送測試 URL 給自己
+- **重要發現**：Google Drive 中文檔名會產生 UTF-8 亂碼，需在 Shortcut 中手動設定檔名（使用當前日期時間）
 
 ### 階段 5：GAS 整合（待實作）
-- 實作 `sendShortcutLinkToLine()`
-- 設定檔案公開權限
-- 透過 LINE 發送 Shortcut 按鈕
+- 新增 GAS 函數：`sendShortcutLinkToLine(userId, pdfFileId)`
+- 設定 PDF 檔案公開權限（`anyone with link` = `reader`）
+- **一次性設定**：將證照檔案也設為公開，取得固定 URL
+- 透過 LINE 發送 Shortcut 按鈕（Quick Reply + URI Action）
+- **Note**：階段4完成後即可進行，不需要等其他階段
 
 ### 階段 6：端到端測試（待實作）
 - LINE 申請 → Shortcut → Bookmarklet → 送出
@@ -170,9 +188,10 @@ if (在表單頁) {
 
 ## ⚠️ 注意事項
 
-### 檔案順序
-- PDF 先下載、證照後下載
-- 上傳時順序一致
+### 檔案順序與命名
+- PDF 先準備、證照後準備
+- 上傳時順序一致：先 PDF、後證照
+- **檔名問題**：Google Drive 中文檔名會產生 UTF-8 編碼亂碼，Shortcut 需手動重建檔名（使用當前日期時間）
 
 ### 網站改版
 - 松菸網站改版時需更新 Bookmarklet 選擇器
@@ -211,8 +230,17 @@ if (在表單頁) {
 ## 📝 文件資訊
 
 **建立日期**：2025-11-12  
-**最後更新**：2025-11-15  
-**當前狀態**：階段 3 完成（Bookmarklet 開發完成）
+**最後更新**：2025-11-21  
+**當前狀態**：階段 4 完成 ✅，準備進入階段 5
+
+**重要變更 (2025-11-21)**：
+- 階段 4 完成：Shortcut 參數化改造成功
+- 發現 Google Drive 中文檔名 UTF-8 亂碼問題，已在 Shortcut 中手動設定檔名解決
+
+**重要變更 (2025-11-15)**：
+- LINE 只傳遞 PDF URL（Google Drive）
+- 證照 URL 固定在 Shortcut 中（Google Drive），不由 LINE 傳入
+- 證照和 PDF 都需設為公開，都從 Google Drive 下載
 
 **相關檔案**：
 - 階段教學：`shortcut-stage0-tutorial.md` ~ `shortcut-stage2-tutorial.md`
