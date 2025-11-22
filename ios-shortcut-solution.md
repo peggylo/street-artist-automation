@@ -178,17 +178,21 @@ if (在表單頁) {
 - Code.js：新增 `setFilePublic(fileId)` + `buildShortcutUrl(pdfFileId)`
 - **測試**：手動執行函數，確認 Drive 權限變更 + console.log URL 格式正確
 
-**步驟2：LINE 按鈕功能**
+**步驟2：LINE 訊息功能** ✅
 - LineHandler.js：新增 `sendShortcutMessage(to, shortcutUrl)`
-  - 訊息：「我幫你寫好申請表了，請點擊下面按鈕取得申請書」
-  - 按鈕：「請按我」（uri action）
-- **測試**：手動呼叫發送測試 URL，LINE 收到按鈕且可啟動 Shortcut
+  - 發送 2 則獨立純文字訊息（LINE 自動識別 shortcuts:// 為可點擊連結）
+  - 第 1 則：「✅ 申請表已準備好，請點擊下方連結取得申請書：」
+  - 第 2 則：`shortcuts://run-shortcut?...`（純網址）
+- **測試**：手動呼叫發送測試 URL，LINE 收到訊息且連結可點擊啟動 Shortcut
+- **重要發現**：LINE Template Message 的 URI action 不支援 `shortcuts://` scheme，改用純文字訊息解決
 
-**步驟3：GAS 回調整合**
+**步驟3：GAS 回調整合** ✅
 - Code.js：修改 `handleCloudRunCallback()`
   - 成功時：setFilePublic → buildShortcutUrl → sendShortcutMessage
-  - 失敗時：只發送錯誤訊息（不含按鈕）
+  - 失敗時：只發送錯誤訊息（不含連結）
+  - 錯誤訊息：「請老媽聯繫peggy協助處理」
 - **測試**：手動呼叫回調函數模擬 Cloud Run 回應，驗證完整流程
+- **測試結果**：成功情況收到 2 則訊息（說明 + 連結），失敗情況收到 1 則錯誤訊息
 
 **步驟4：Cloud Run 修改與端到端測試**
 - main.py：回調資料加入 `pdf_file_id` 欄位
@@ -197,15 +201,15 @@ if (在表單頁) {
 #### 關鍵決策
 - **Phase 6 停用**：`Config.js` 設定 `ENABLE_WEBSITE_AUTOMATION: false`（網站自動化確定失敗，改用 Shortcut 半自動方案）
 - **Cloud Run 回調**：PDF 生成完成後立即回調 GAS（跳過網站自動化），回調資料只包含 `pdf_file_id`（不傳 URL）
-- **LINE 訊息格式**：Template Message (Buttons)，VoiceOver 友善且支援 URI action
-  - 訊息內容：「我幫你寫好申請表了，請點擊下面按鈕取得申請書」
-  - 按鈕文字：「取得申請書」（VoiceOver 會念「取得申請書 按鈕」）
-  - altText：「申請表已準備好，請點擊按鈕繼續」（通知欄顯示，收到通知時 VoiceOver 會念）
+- **LINE 訊息格式**：純文字訊息（2 則獨立訊息），VoiceOver 友善
+  - 第 1 則：「✅ 申請表已準備好，請點擊下方連結取得申請書：」
+  - 第 2 則：`shortcuts://run-shortcut?...`（純網址，LINE 自動識別為可點擊連結）
+  - 原因：Template Message 的 URI action 不支援 `shortcuts://` 自定義 scheme
 - **PDF 權限設定**：GAS 收到回調後執行 `setFilePublic(pdf_file_id)`，由 GAS 統一管理 Drive 權限
 - **Shortcut URL 格式**：`shortcuts://run-shortcut?name=松菸申請&input=text&text={download_url}`
   - `download_url` = `https://drive.google.com/uc?export=download&id={pdf_file_id}`
   - 只需傳遞 file ID，由 GAS 組合成下載連結
-- **錯誤處理**：失敗時不發送按鈕，只發送錯誤訊息
+- **錯誤處理**：失敗時只發送錯誤訊息（不含連結），內容：「請老媽聯繫peggy協助處理」
 - **證照檔案**：不處理（已固定在 Shortcut 中）
 - **檔案結構**：依職責分散到 Config/LineHandler/Code（不獨立成新檔案）
 
@@ -263,8 +267,13 @@ if (在表單頁) {
 ## 📝 文件資訊
 
 **建立日期**：2025-11-12  
-**最後更新**：2025-11-21  
-**當前狀態**：階段 4 完成 ✅，準備進入階段 5
+**最後更新**：2025-12-22  
+**當前狀態**：階段 5 步驟 1-3 完成 ✅，準備進入步驟 4
+
+**重要變更 (2025-12-22)**：
+- 階段 5 步驟 1-3 完成：GAS 工具函數、LINE 訊息、回調整合全部測試通過
+- 發現 LINE Template Message 不支援 `shortcuts://` scheme，改用純文字訊息（2 則獨立訊息）
+- 純文字方案更簡潔，VoiceOver 友善，LINE 自動識別連結為可點擊
 
 **重要變更 (2025-11-21)**：
 - 階段 4 完成：Shortcut 參數化改造成功

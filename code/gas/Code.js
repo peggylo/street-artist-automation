@@ -1661,68 +1661,69 @@ function callCloudRunForDocumentProcessing(userId, cloudRunData, groupId = null)
 }
 
 /**
- * Phase 6: 處理來自 Cloud Run 的回調
+ * 階段 5: 處理來自 Cloud Run 的回調（Shortcut 半自動化方案）
  * @param {Object} callbackData - Cloud Run 回傳的資料
  */
 function handleCloudRunCallback(callbackData) {
   try {
-    console.log('🌐 Phase 6: 處理 Cloud Run 回調');
+    console.log('🌐 階段 5: 處理 Cloud Run 回調');
     console.log('📋 回調資料:', JSON.stringify(callbackData, null, 2));
     
     const success = callbackData.success;
     const userId = callbackData.user_id;
-    const groupId = callbackData.group_id;  // 群組 ID
-    const timestamp = callbackData.timestamp;
-    const message = callbackData.message;
+    const groupId = callbackData.group_id;
+    const pdfFileId = callbackData.pdf_file_id;
+    const message = callbackData.message || '';
     
     // 決定發送對象（優先使用群組，否則使用用戶）
     const targetId = groupId || userId;
     
+    if (!targetId) {
+      console.error('❌ 缺少發送對象（user_id 或 group_id）');
+      return false;
+    }
+    
     if (success) {
-      // ===== 成功：發送文字訊息 + 截圖 =====
-      console.log('✅ 網站自動化成功');
+      // ===== 成功：發送 Shortcut 連結 =====
+      console.log('✅ 文件處理成功，準備發送 Shortcut 連結');
       
-      // 1. 發送文字訊息
-      pushMessage(targetId, message);
+      // 檢查必要參數
+      if (!pdfFileId) {
+        console.error('❌ 缺少 pdf_file_id');
+        pushMessage(targetId, '❌ 系統錯誤：缺少檔案資訊，請老媽聯繫peggy協助處理');
+        return false;
+      }
       
-      // 2. 下載並發送截圖
-      const screenshotUrl = callbackData.screenshot_url;
-      if (screenshotUrl) {
-        console.log('📸 準備發送截圖:', screenshotUrl);
-        
-        // 使用 downloadAndPushImage 從 Signed URL 下載並發送
-        const imageSuccess = downloadAndPushImage(targetId, screenshotUrl);
-        
-        if (imageSuccess) {
-          console.log('✅ 截圖發送成功');
-        } else {
-          console.error('❌ 截圖發送失敗');
-          // 即使截圖失敗，也不影響主流程
-        }
+      // 1. 設定 PDF 為公開
+      console.log('🔓 步驟 1: 設定 PDF 為公開');
+      const publicSuccess = setFilePublic(pdfFileId);
+      if (!publicSuccess) {
+        console.error('❌ 設定檔案權限失敗');
+        pushMessage(targetId, '❌ 檔案權限設定失敗，請老媽聯繫peggy協助處理');
+        return false;
+      }
+      
+      // 2. 構建 Shortcut URL
+      console.log('📱 步驟 2: 構建 Shortcut URL');
+      const shortcutUrl = buildShortcutUrl(pdfFileId);
+      
+      // 3. 發送 Shortcut 連結訊息
+      console.log('📤 步驟 3: 發送 Shortcut 連結訊息');
+      const sendSuccess = sendShortcutMessage(targetId, shortcutUrl);
+      
+      if (sendSuccess) {
+        console.log('✅ Shortcut 連結已成功發送');
       } else {
-        console.warn('⚠️ 沒有截圖 URL');
+        console.error('❌ Shortcut 連結發送失敗');
+        return false;
       }
       
     } else {
-      // ===== 失敗：發送錯誤訊息 + 失敗截圖（如果有）=====
-      console.error('❌ 網站自動化失敗');
+      // ===== 失敗：發送錯誤訊息 =====
+      console.error('❌ 文件處理失敗');
       
-      // 1. 發送錯誤訊息
-      pushMessage(targetId, message);
-      
-      // 2. 如果有失敗截圖，也發送
-      const failureScreenshotUrl = callbackData.failure_screenshot_url;
-      if (failureScreenshotUrl) {
-        console.log('📸 準備發送失敗截圖:', failureScreenshotUrl);
-        
-        const imageSuccess = downloadAndPushImage(targetId, failureScreenshotUrl);
-        
-        if (imageSuccess) {
-          console.log('✅ 失敗截圖發送成功');
-        } else {
-          console.error('❌ 失敗截圖發送失敗');
-        }
-      }
+      const errorMessage = message || '處理失敗，請稍後重試';
+      pushMessage(targetId, `❌ 申請處理失敗\n\n${errorMessage}\n\n請老媽聯繫peggy協助處理`);
     }
     
     console.log('🎯 Cloud Run 回調處理完成');
@@ -1731,6 +1732,17 @@ function handleCloudRunCallback(callbackData) {
   } catch (error) {
     console.error('❌ 處理 Cloud Run 回調時發生錯誤:', error);
     console.error('📋 錯誤詳情:', error.stack);
+    
+    // 嘗試通知用戶
+    try {
+      const targetId = callbackData.group_id || callbackData.user_id;
+      if (targetId) {
+        pushMessage(targetId, '❌ 系統發生錯誤，請老媽聯繫peggy協助處理');
+      }
+    } catch (notifyError) {
+      console.error('❌ 通知用戶失敗:', notifyError);
+    }
+    
     return false;
   }
 }
@@ -2284,6 +2296,140 @@ function testPhase5Step2() {
       testFileName: testFileName,
       shortcutUrl: shortcutUrl,
       lineSent: true
+    };
+    
+  } catch (error) {
+    console.error('❌ 測試失敗:', error);
+    console.error('錯誤詳情:', error.stack);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 🧪 測試階段 5 步驟 3：Cloud Run 回調整合
+ * 測試 handleCloudRunCallback() 能否正確串接步驟 1-2 的函數
+ * 保留供未來測試使用
+ */
+function testPhase5Step3() {
+  console.log('========================================');
+  console.log('🧪 階段 5 步驟 3 測試開始');
+  console.log('========================================');
+  
+  try {
+    // 測試用戶 ID
+    const testUserId = 'Ue75403f8c9bfc49141bf88072646eacf';
+    
+    console.log('\n👤 測試對象:', testUserId);
+    
+    // 準備測試用 PDF
+    console.log('\n📄 準備測試 PDF');
+    const generatedFolderId = CONFIG.PHASE5.TEMPLATE.GENERATED_FOLDER_ID;
+    const folder = DriveApp.getFolderById(generatedFolderId);
+    const files = folder.getFilesByType(MimeType.PDF);
+    
+    if (!files.hasNext()) {
+      console.error('❌ 資料夾內找不到 PDF 檔案');
+      return { success: false, error: '找不到測試 PDF' };
+    }
+    
+    const testPdf = files.next();
+    const testFileId = testPdf.getId();
+    const testFileName = testPdf.getName();
+    
+    console.log('找到測試 PDF:', testFileName);
+    console.log('檔案 ID:', testFileId);
+    
+    // ===== 測試情況 1：成功回調 =====
+    console.log('\n========================================');
+    console.log('📋 測試情況 1: 模擬成功回調');
+    console.log('========================================');
+    
+    const successCallbackData = {
+      success: true,
+      user_id: testUserId,
+      group_id: null,
+      pdf_file_id: testFileId,
+      timestamp: '20251222-0800',
+      message: '✅ 申請表已準備好'
+    };
+    
+    console.log('模擬回調資料:', JSON.stringify(successCallbackData, null, 2));
+    console.log('\n🚀 呼叫 handleCloudRunCallback()...');
+    
+    const successResult = handleCloudRunCallback(successCallbackData);
+    
+    if (successResult) {
+      console.log('✅ 成功回調處理完成');
+    } else {
+      console.error('❌ 成功回調處理失敗');
+      return { success: false, error: '成功回調處理失敗' };
+    }
+    
+    console.log('\n📱 請到 LINE 確認:');
+    console.log('   - 應該收到 2 則訊息');
+    console.log('   - 第 1 則: ✅ 申請表已準備好，請點擊下方連結取得申請書：');
+    console.log('   - 第 2 則: shortcuts://... (可點擊連結)');
+    
+    // 等待 3 秒讓 LINE 訊息送達
+    console.log('\n⏳ 等待 3 秒...');
+    Utilities.sleep(3000);
+    
+    // ===== 測試情況 2：失敗回調 =====
+    console.log('\n========================================');
+    console.log('📋 測試情況 2: 模擬失敗回調');
+    console.log('========================================');
+    
+    const failureCallbackData = {
+      success: false,
+      user_id: testUserId,
+      group_id: null,
+      timestamp: '20251222-0801',
+      message: '測試錯誤：這是模擬的錯誤訊息'
+    };
+    
+    console.log('模擬回調資料:', JSON.stringify(failureCallbackData, null, 2));
+    console.log('\n🚀 呼叫 handleCloudRunCallback()...');
+    
+    const failureResult = handleCloudRunCallback(failureCallbackData);
+    
+    if (failureResult) {
+      console.log('✅ 失敗回調處理完成');
+    } else {
+      console.error('❌ 失敗回調處理失敗');
+      return { success: false, error: '失敗回調處理失敗' };
+    }
+    
+    console.log('\n📱 請到 LINE 確認:');
+    console.log('   - 應該收到 1 則錯誤訊息');
+    console.log('   - 內容包含: ❌ 申請處理失敗');
+    console.log('   - 不應該有 Shortcut 連結');
+    
+    // ===== 測試完成 =====
+    console.log('\n========================================');
+    console.log('🎉 階段 5 步驟 3 測試完成！');
+    console.log('========================================');
+    console.log('📋 測試摘要:');
+    console.log('   - 測試檔案:', testFileName);
+    console.log('   - 檔案 ID:', testFileId);
+    console.log('   - 成功回調: 已處理');
+    console.log('   - 失敗回調: 已處理');
+    console.log('\n✅ 驗證清單:');
+    console.log('   1. LINE 收到成功訊息 (2 則)');
+    console.log('   2. Shortcut 連結可點擊');
+    console.log('   3. LINE 收到失敗訊息 (1 則)');
+    console.log('   4. 失敗訊息不含連結');
+    console.log('========================================');
+    
+    return {
+      success: true,
+      testUserId: testUserId,
+      testFileId: testFileId,
+      testFileName: testFileName,
+      successCallback: successResult,
+      failureCallback: failureResult
     };
     
   } catch (error) {
