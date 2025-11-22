@@ -198,8 +198,9 @@ if (在表單頁) {
 - main.py：跳過網站自動化，直接回調 GAS
 - 回調資料只傳 `pdf_file_id` 和 `group_id`
 - 更新 Sheets 狀態為「完成」
-- 移除確認訊息（用戶說「好」後不立即回覆，只等 Shortcut 連結）
+- Code.js：`executeFinalApplication()` 返回特殊標記 `__HANDLED__`（避免空字串導致繼續進入 AI 分析）
 - **測試**：完整流程 LINE 申請 → PDF 生成 → 收到 Shortcut 連結 → 點擊啟動
+- **Bug 修復**：原返回空字串導致 AI 誤判「好」為「確認」意圖，改用特殊標記解決
 
 #### 關鍵決策
 - **Phase 6 停用**：網站自動化確定失敗，改用 Shortcut 半自動方案，main.py 跳過網站自動化直接回調

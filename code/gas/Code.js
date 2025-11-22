@@ -618,7 +618,8 @@ function executeFinalApplication(userId, groupId = null) {
     clearUserState(userId);
     
     // 階段 5：不發送確認訊息，只等 Cloud Run 完成後的 Shortcut 連結
-    return '';
+    // 返回特殊標記表示已處理但不需要回覆
+    return '__HANDLED__';
     
   } catch (error) {
     console.error('❌ 申請記錄過程發生錯誤:', error);
@@ -1284,6 +1285,12 @@ function handleTextMessageWithState(event, text) {
     if (userState && userState.currentStep) {
       const stateResponse = handleStateBasedInput(userState, text, userId, event);
       if (stateResponse) {
+        // 檢查是否為特殊標記（已處理但不需要回覆）
+        if (stateResponse === '__HANDLED__') {
+          console.log('✅ 訊息已處理，無需回覆');
+          return;
+        }
+        // 一般情況：發送回覆訊息
         replyMessage(replyToken, stateResponse);
         return;
       }
