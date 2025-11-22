@@ -194,24 +194,21 @@ if (在表單頁) {
 - **測試**：手動呼叫回調函數模擬 Cloud Run 回應，驗證完整流程
 - **測試結果**：成功情況收到 2 則訊息（說明 + 連結），失敗情況收到 1 則錯誤訊息
 
-**步驟4：Cloud Run 修改與端到端測試**
-- main.py：回調資料加入 `pdf_file_id` 欄位
-- **測試**：完整流程 LINE 申請 → PDF 生成 → 收到按鈕 → 點擊啟動 Shortcut
+**步驟4：Cloud Run 修改與端到端測試** ✅
+- main.py：跳過網站自動化，直接回調 GAS
+- 回調資料只傳 `pdf_file_id` 和 `group_id`
+- 更新 Sheets 狀態為「完成」
+- 移除確認訊息（用戶說「好」後不立即回覆，只等 Shortcut 連結）
+- **測試**：完整流程 LINE 申請 → PDF 生成 → 收到 Shortcut 連結 → 點擊啟動
 
 #### 關鍵決策
-- **Phase 6 停用**：`Config.js` 設定 `ENABLE_WEBSITE_AUTOMATION: false`（網站自動化確定失敗，改用 Shortcut 半自動方案）
-- **Cloud Run 回調**：PDF 生成完成後立即回調 GAS（跳過網站自動化），回調資料只包含 `pdf_file_id`（不傳 URL）
-- **LINE 訊息格式**：純文字訊息（2 則獨立訊息），VoiceOver 友善
-  - 第 1 則：「✅ 申請表已準備好，請點擊下方連結取得申請書：」
-  - 第 2 則：`shortcuts://run-shortcut?...`（純網址，LINE 自動識別為可點擊連結）
-  - 原因：Template Message 的 URI action 不支援 `shortcuts://` 自定義 scheme
-- **PDF 權限設定**：GAS 收到回調後執行 `setFilePublic(pdf_file_id)`，由 GAS 統一管理 Drive 權限
-- **Shortcut URL 格式**：`shortcuts://run-shortcut?name=松菸申請&input=text&text={download_url}`
-  - `download_url` = `https://drive.google.com/uc?export=download&id={pdf_file_id}`
-  - 只需傳遞 file ID，由 GAS 組合成下載連結
-- **錯誤處理**：失敗時只發送錯誤訊息（不含連結），內容：「請老媽聯繫peggy協助處理」
-- **證照檔案**：不處理（已固定在 Shortcut 中）
-- **檔案結構**：依職責分散到 Config/LineHandler/Code（不獨立成新檔案）
+- **Phase 6 停用**：網站自動化確定失敗，改用 Shortcut 半自動方案，main.py 跳過網站自動化直接回調
+- **Cloud Run 回調**：PDF 生成完成後立即回調 GAS，回調資料只包含 `pdf_file_id` 和 `group_id`
+- **確認訊息移除**：用戶說「好」後不發送確認訊息，直接等待 Cloud Run 完成（避免訊息順序混亂）
+- **LINE 訊息格式**：純文字訊息（2 則），第 1 則說明文字，第 2 則為 `shortcuts://` 連結（LINE 自動識別為可點擊）
+- **PDF 權限設定**：GAS 收到回調後執行 `setFilePublic(pdf_file_id)`
+- **錯誤處理**：失敗時發送「請老媽聯繫peggy協助處理」
+- **證照檔案**：已固定在 Shortcut 中，不經 LINE 傳送
 
 ### 階段 6：端到端測試（待實作）
 - LINE 申請 → Shortcut → Bookmarklet → 送出
@@ -238,6 +235,16 @@ if (在表單頁) {
 - 修改 `songshan-bookmarklet.js`
 - 重新壓縮產生新的 minified 版本
 - 更新 Safari 書籤內容
+
+---
+
+## 🔮 未來優化事項
+
+### 確認訊息機制
+- **現狀**：用戶說「好」後無立即回覆，需等待 10-30 秒才收到 Shortcut 連結
+- **原因**：曾嘗試發送確認訊息，但因 LINE API 訊息佇列機制導致順序混亂（Shortcut 連結比確認訊息先到）
+- **待釐清**：是否為 Cloud Run 處理速度太快、GAS 非同步執行問題，或 LINE Push/Reply Message 佇列差異
+- **可能方案**：1) 接受現狀，2) 改用 Push Message 發送確認訊息，3) Cloud Run 延遲回調
 
 ---
 
@@ -268,12 +275,13 @@ if (在表單頁) {
 
 **建立日期**：2025-11-12  
 **最後更新**：2025-12-22  
-**當前狀態**：階段 5 步驟 1-3 完成 ✅，準備進入步驟 4
+**當前狀態**：階段 5 完成 ✅，準備進入階段 6 端到端測試
 
 **重要變更 (2025-12-22)**：
-- 階段 5 步驟 1-3 完成：GAS 工具函數、LINE 訊息、回調整合全部測試通過
-- 發現 LINE Template Message 不支援 `shortcuts://` scheme，改用純文字訊息（2 則獨立訊息）
-- 純文字方案更簡潔，VoiceOver 友善，LINE 自動識別連結為可點擊
+- 階段 5 完成：GAS 與 Cloud Run 整合完成，端到端流程測試通過
+- Cloud Run 跳過網站自動化，直接回調 GAS 發送 Shortcut 連結
+- 移除確認訊息（用戶說「好」後無立即回覆），避免訊息順序混亂
+- 發現 LINE 訊息順序問題，列為未來優化事項
 
 **重要變更 (2025-11-21)**：
 - 階段 4 完成：Shortcut 參數化改造成功

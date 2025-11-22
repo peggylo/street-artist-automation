@@ -617,16 +617,8 @@ function executeFinalApplication(userId, groupId = null) {
     // 清除對話狀態
     clearUserState(userId);
     
-    return `✅ 申請已送出並記錄！
-
-📅 申請月份：${state.targetMonth.display}
-📍 申請日期：${dateDisplay}
-🎬 表演影片：${videoDisplay}
-
-📊 申請資訊已記錄到系統${documentProcessingMessage}
-
-🎉 Phase 6 完整自動化流程已啟動！
-⏳ 請稍候，系統處理完成後會通知您`;
+    // 階段 5：不發送確認訊息，只等 Cloud Run 完成後的 Shortcut 連結
+    return '';
     
   } catch (error) {
     console.error('❌ 申請記錄過程發生錯誤:', error);
@@ -634,14 +626,8 @@ function executeFinalApplication(userId, groupId = null) {
     // 即使記錄失敗也要清除狀態
     clearUserState(userId);
     
-    return `✅ 申請已送出！
-
-📅 申請月份：${state.targetMonth.display}
-📍 申請日期：${dateDisplay}
-🎬 表演影片：${videoDisplay}
-
-⚠️ 資料記錄可能有問題，請聯繫管理員
-📧 系統將自動處理您的申請`;
+    // 發生錯誤時通知用戶
+    return '❌ 系統發生錯誤，請老媽聯繫peggy協助處理';
   }
 }
 

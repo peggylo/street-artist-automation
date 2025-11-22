@@ -599,105 +599,50 @@ def process_application():
         
         logger.info("✅ Phase 5: 文件處理完成")
         
-        # ===== Phase 6: 網站自動化 =====
-        logger.info("🌐 Phase 6: 開始網站自動化...")
+        # ===== 階段 5: Shortcut 半自動化方案（跳過網站自動化）=====
+        logger.info("📱 階段 5: 準備 Shortcut 半自動化方案")
         
-        # 更新 Sheets 狀態為「網站提交中」
-        doc_processor.update_sheets_status(user_id, app_data, pdf_url, "網站提交中")
+        # 更新 Sheets 狀態為「完成」
+        doc_processor.update_sheets_status(user_id, app_data, pdf_url, "完成", "")
+        logger.info("✅ Sheets 狀態已更新為「完成」")
         
-        # 呼叫網站自動化（階段 2B：不提交）
-        from website_automation_cloud import WebsiteAutomationCloud
-        
-        automation = WebsiteAutomationCloud(stage="2B")
-        automation_result = automation.run_automation(app_data)
-        
-        if automation_result['success']:
-            logger.info("✅ Phase 6: 網站自動化成功")
+        # 回調 GAS（如果有提供回調 URL）
+        if gas_callback_url:
+            # 取得 group_id（從請求資料中）
+            group_id = application_data.get("group_id")
             
-            # 更新 Sheets 狀態為「填寫完成（測試）」
-            doc_processor.update_sheets_status(
-                user_id, 
-                app_data, 
-                pdf_url, 
-                "填寫完成（測試）",
-                ""
-            )
-            
-            # 回調 GAS（如果有提供回調 URL）
-            if gas_callback_url:
-                callback_data = {
-                    "success": True,
-                    "user_id": user_id,
-                    "timestamp": timestamp,
-                    "pdf_url": pdf_url,
-                    "screenshot_url": automation_result.get('screenshot_url'),
-                    "verification": automation_result.get('verification', {}),
-                    "message": "✅ 表單填寫完成！請確認截圖"
-                }
-                
-                try:
-                    import requests
-                    callback_response = requests.post(
-                        gas_callback_url,
-                        json=callback_data,
-                        timeout=10
-                    )
-                    logger.info(f"✅ 已回調 GAS: {callback_response.status_code}")
-                except Exception as callback_error:
-                    logger.error(f"⚠️ 回調 GAS 失敗: {str(callback_error)}")
-            
-            return jsonify({
+            callback_data = {
                 "success": True,
-                "message": "申請處理和網站自動化完成",
-                "pdf_url": pdf_url,
-                "screenshot_url": automation_result.get('screenshot_url'),
-                "verification": automation_result.get('verification', {}),
-                "user_id": user_id
-            })
+                "user_id": user_id,
+                "group_id": group_id,
+                "timestamp": timestamp,
+                "pdf_file_id": app_data.get("pdfFileId"),
+                "message": "✅ 申請表已準備好"
+            }
             
-        else:
-            logger.error(f"❌ Phase 6: 網站自動化失敗 - {automation_result.get('error')}")
+            logger.info("📤 準備回調 GAS")
+            logger.info(f"📋 回調資料: {callback_data}")
             
-            # 更新 Sheets 狀態為「失敗」
-            error_message = f"[網站提交] {automation_result.get('error', '未知錯誤')}"
-            doc_processor.update_sheets_status(
-                user_id, 
-                app_data, 
-                pdf_url, 
-                "失敗",
-                error_message
-            )
-            
-            # 回調 GAS（失敗通知）
-            if gas_callback_url:
-                callback_data = {
-                    "success": False,
-                    "user_id": user_id,
-                    "timestamp": timestamp,
-                    "pdf_url": pdf_url,
-                    "failure_screenshot_url": automation_result.get('failure_screenshot_url'),
-                    "error": error_message,
-                    "message": f"❌ 網站自動化失敗\n⚠️ {error_message}"
-                }
-                
-                try:
-                    import requests
-                    callback_response = requests.post(
-                        gas_callback_url,
-                        json=callback_data,
-                        timeout=10
-                    )
-                    logger.info(f"✅ 已回調 GAS（失敗通知）: {callback_response.status_code}")
-                except Exception as callback_error:
-                    logger.error(f"⚠️ 回調 GAS 失敗: {str(callback_error)}")
-            
-            return jsonify({
-                "success": False,
-                "error": error_message,
-                "pdf_url": pdf_url,
-                "failure_screenshot_url": automation_result.get('failure_screenshot_url'),
-                "result": automation_result
-            }), 500
+            try:
+                import requests
+                callback_response = requests.post(
+                    gas_callback_url,
+                    json=callback_data,
+                    timeout=10
+                )
+                logger.info(f"✅ 已回調 GAS: {callback_response.status_code}")
+            except Exception as callback_error:
+                logger.error(f"⚠️ 回調 GAS 失敗: {str(callback_error)}")
+        
+        logger.info("🎉 階段 5: 文件處理和回調完成")
+        
+        return jsonify({
+            "success": True,
+            "message": "申請處理完成，Shortcut 連結已發送",
+            "pdf_url": pdf_url,
+            "pdf_file_id": app_data.get("pdfFileId"),
+            "user_id": user_id
+        })
         
     except Exception as e:
         logger.error(f"❌ 處理申請失敗: {str(e)}")
@@ -705,6 +650,7 @@ def process_application():
         # 更新失敗狀態
         try:
             user_id = application_data.get("user_id") if application_data else "unknown"
+            group_id = application_data.get("group_id") if application_data else None
             app_data = application_data.get("application_data", {}) if application_data else {}
             error_message = f"[文件處理] {str(e)}"
             doc_processor.update_sheets_status(user_id, app_data, "", "失敗", error_message)
@@ -715,18 +661,22 @@ def process_application():
                 callback_data = {
                     "success": False,
                     "user_id": user_id,
+                    "group_id": group_id,
                     "timestamp": application_data.get("timestamp", ""),
-                    "error": error_message,
-                    "message": f"❌ 文件處理失敗\n⚠️ {error_message}"
+                    "message": f"文件處理失敗: {str(e)}"
                 }
+                
+                logger.info(f"📤 準備回調 GAS（失敗通知）")
+                logger.info(f"📋 回調資料: {callback_data}")
                 
                 try:
                     import requests
                     requests.post(gas_callback_url, json=callback_data, timeout=10)
-                except:
-                    pass
-        except:
-            pass  # 避免二次錯誤
+                    logger.info("✅ 已回調 GAS（失敗通知）")
+                except Exception as callback_error:
+                    logger.error(f"⚠️ 回調 GAS 失敗: {str(callback_error)}")
+        except Exception as notify_error:
+            logger.error(f"❌ 通知處理失敗: {str(notify_error)}")
         
         return jsonify({
             "success": False,
