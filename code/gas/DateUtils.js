@@ -4,7 +4,7 @@
  */
 
 /**
- * 檢查當前是否在申請時間窗口內（每月1-15日）
+ * 檢查當前是否在申請時間窗口內（雙時段制：每月1-15日及20-31日）
  * @return {Object} {isOpen: boolean, message: string, nextMonth: string}
  */
 function checkApplicationWindow() {
@@ -14,7 +14,11 @@ function checkApplicationWindow() {
   const currentYear = now.getFullYear();
   
   const config = CONFIG.PHASE3.APPLICATION_WINDOW;
-  const isOpen = currentDay >= config.START_DAY && currentDay <= config.END_DAY;
+  
+  // 判斷是否在兩個時段之一
+  const inPeriod1 = currentDay >= config.PERIOD1_START && currentDay <= config.PERIOD1_END;
+  const inPeriod2 = currentDay >= config.PERIOD2_START && currentDay <= config.PERIOD2_END;
+  const isOpen = inPeriod1 || inPeriod2;
   
   if (isOpen) {
     // 計算可申請的月份
@@ -27,24 +31,27 @@ function checkApplicationWindow() {
   } else {
     // 計算下次開放時間
     let nextOpenDate;
-    if (currentDay > config.END_DAY) {
-      // 本月已過期，下月1日開放
-      nextOpenDate = new Date(currentYear, currentMonth, 1); // 注意：這裡月份不用減1
+    if (currentDay < config.PERIOD1_START) {
+      // 在第一時段之前（例如：11月還未到1日）
+      nextOpenDate = new Date(currentYear, currentMonth - 1, config.PERIOD1_START);
+    } else if (currentDay > config.PERIOD1_END && currentDay < config.PERIOD2_START) {
+      // 在兩個時段之間（16-19日）
+      nextOpenDate = new Date(currentYear, currentMonth - 1, config.PERIOD2_START);
     } else {
-      // 本月還未開始
-      nextOpenDate = new Date(currentYear, currentMonth - 1, 1);
+      // 在第二時段之後（例如：11月已過31日，等下月1日）
+      nextOpenDate = new Date(currentYear, currentMonth, config.PERIOD1_START);
     }
     
     return {
       isOpen: false,
-      message: `申請時間為每月 ${config.START_DAY}-${config.END_DAY} 日\n下次開放：${formatDate(nextOpenDate)}`,
+      message: `申請時間為每月 ${config.PERIOD1_START}-${config.PERIOD1_END} 日及 ${config.PERIOD2_START}-${config.PERIOD2_END} 日\n下次開放：${formatDate(nextOpenDate)}`,
       nextOpenDate: nextOpenDate
     };
   }
 }
 
 /**
- * 取得可申請的月份
+ * 取得可申請的月份（雙時段制）
  * @return {Array} 可申請的月份陣列 [{month: 10, year: 2025, display: "10月"}]
  */
 function getAvailableMonths() {
@@ -56,17 +63,25 @@ function getAvailableMonths() {
   const config = CONFIG.PHASE3.APPLICATION_WINDOW;
   const months = [];
   
-  // 根據當前日期決定可申請的月份
-  if (currentDay >= config.START_DAY && currentDay <= config.END_DAY) {
-    // 在申請窗口內，可申請未來1-2個月
-    for (let i = 1; i <= config.ADVANCE_MONTHS; i++) {
-      const targetDate = new Date(currentYear, currentMonth + i, 1);
-      months.push({
-        month: targetDate.getMonth() + 1,
-        year: targetDate.getFullYear(),
-        display: `${targetDate.getMonth() + 1}月`
-      });
-    }
+  // 判斷當前在哪個時段，並決定推算月份
+  let advanceMonths = 0;
+  
+  if (currentDay >= config.PERIOD1_START && currentDay <= config.PERIOD1_END) {
+    // 第一時段（1-15日）：申請下1個月
+    advanceMonths = config.PERIOD1_ADVANCE_MONTHS; // 1
+  } else if (currentDay >= config.PERIOD2_START && currentDay <= config.PERIOD2_END) {
+    // 第二時段（20-31日）：申請下2個月
+    advanceMonths = config.PERIOD2_ADVANCE_MONTHS; // 2
+  }
+  
+  // 只返回單一可申請月份
+  if (advanceMonths > 0) {
+    const targetDate = new Date(currentYear, currentMonth + advanceMonths, 1);
+    months.push({
+      month: targetDate.getMonth() + 1,
+      year: targetDate.getFullYear(),
+      display: `${targetDate.getMonth() + 1}月`
+    });
   }
   
   return months;
