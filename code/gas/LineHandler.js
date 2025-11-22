@@ -370,6 +370,72 @@ function downloadAndPushImage(to, signedUrl) {
 }
 
 /**
+ * 階段 5: 發送 Shortcut 連結訊息（iOS Shortcut 半自動化方案）
+ * 使用純文字訊息，LINE 會自動識別 shortcuts:// 為可點擊連結
+ * 發送兩個獨立訊息：說明文字 + 連結網址
+ * @param {string} to - 用戶 ID 或群組 ID
+ * @param {string} shortcutUrl - Shortcut URL
+ * @return {boolean} 是否發送成功
+ */
+function sendShortcutMessage(to, shortcutUrl) {
+  try {
+    console.log('📤 準備發送 Shortcut 連結訊息給:', to);
+    console.log('📱 Shortcut URL:', shortcutUrl);
+    
+    const lineConfig = getLineConfig();
+    const url = 'https://api.line.me/v2/bot/message/push';
+    
+    // 發送兩個獨立訊息（VoiceOver 友善格式）
+    const payload = {
+      to: to,
+      messages: [
+        {
+          type: 'text',
+          text: '✅ 申請表已準備好，請點擊下方連結取得申請書：'
+        },
+        {
+          type: 'text',
+          text: shortcutUrl
+        }
+      ]
+    };
+    
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + lineConfig.ACCESS_TOKEN
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    console.log('🚀 發送 LINE 文字訊息（2 則）...');
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    console.log('📨 LINE API 回應:', {
+      code: responseCode,
+      response: responseText
+    });
+    
+    if (responseCode === 200) {
+      console.log('✅ Shortcut 連結訊息發送成功（2 則）');
+      return true;
+    } else {
+      console.error('❌ 發送失敗:', responseCode, responseText);
+      return false;
+    }
+    
+  } catch (error) {
+    console.error('❌ 發送 Shortcut 訊息錯誤:', error);
+    console.error('📋 錯誤詳情:', error.stack);
+    return false;
+  }
+}
+
+/**
  * 測試 LINE API 連線
  */
 function testLineAPI() {

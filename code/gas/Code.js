@@ -2067,3 +2067,231 @@ function diagnoseAuthorizationStatus() {
   
   return results;
 }
+
+// =====================================================
+// 階段 5: iOS Shortcut 半自動化方案工具函數
+// =====================================================
+
+/**
+ * 階段 5: 設定 Drive 檔案為公開
+ * @param {string} fileId - 檔案 ID
+ * @return {boolean} 是否設定成功
+ */
+function setFilePublic(fileId) {
+  try {
+    console.log('🔓 設定檔案為公開:', fileId);
+    const file = DriveApp.getFileById(fileId);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    console.log('✅ 檔案已設為公開');
+    return true;
+  } catch (error) {
+    console.error('❌ 設定檔案權限失敗:', error);
+    return false;
+  }
+}
+
+/**
+ * 階段 5: 構建 Shortcut URL
+ * @param {string} pdfFileId - PDF 檔案 ID
+ * @return {string} Shortcut URL
+ */
+function buildShortcutUrl(pdfFileId) {
+  try {
+    const shortcutConfig = CONFIG.SHORTCUT;
+    const downloadUrl = shortcutConfig.DRIVE_DOWNLOAD_BASE + pdfFileId;
+    const encodedUrl = encodeURIComponent(downloadUrl);
+    
+    const shortcutUrl = `${shortcutConfig.BASE_URL}?name=${encodeURIComponent(shortcutConfig.NAME)}&input=text&text=${encodedUrl}`;
+    
+    console.log('📱 Shortcut URL 已構建:', shortcutUrl);
+    return shortcutUrl;
+  } catch (error) {
+    console.error('❌ 構建 Shortcut URL 失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 🧪 測試階段 5 步驟 1：基礎設定與工具函數
+ * 保留供未來測試使用
+ */
+function testPhase5Step1() {
+  console.log('========================================');
+  console.log('🧪 階段 5 步驟 1 測試開始');
+  console.log('========================================');
+  
+  try {
+    // 測試 1: 讀取 Shortcut 設定
+    console.log('\n📋 測試 1: 讀取 Shortcut 設定');
+    console.log('Shortcut NAME:', CONFIG.SHORTCUT.NAME);
+    console.log('Shortcut BASE_URL:', CONFIG.SHORTCUT.BASE_URL);
+    console.log('Shortcut DRIVE_DOWNLOAD_BASE:', CONFIG.SHORTCUT.DRIVE_DOWNLOAD_BASE);
+    console.log('✅ Shortcut 設定讀取成功');
+    
+    // 測試 2: 找到測試用 PDF
+    console.log('\n📄 測試 2: 從生成文件資料夾找測試 PDF');
+    const generatedFolderId = CONFIG.PHASE5.TEMPLATE.GENERATED_FOLDER_ID;
+    const folder = DriveApp.getFolderById(generatedFolderId);
+    const files = folder.getFilesByType(MimeType.PDF);
+    
+    if (!files.hasNext()) {
+      console.error('❌ 資料夾內找不到 PDF 檔案');
+      return { success: false, error: '找不到測試 PDF' };
+    }
+    
+    const testPdf = files.next();
+    const testFileId = testPdf.getId();
+    const testFileName = testPdf.getName();
+    
+    console.log('找到測試 PDF:', testFileName);
+    console.log('檔案 ID:', testFileId);
+    console.log('✅ 測試 PDF 找到');
+    
+    // 測試 3: 設定檔案公開
+    console.log('\n🔓 測試 3: 設定檔案為公開');
+    const publicSuccess = setFilePublic(testFileId);
+    if (!publicSuccess) {
+      return { success: false, error: '設定公開失敗' };
+    }
+    console.log('✅ 檔案權限設定成功');
+    
+    // 測試 4: 構建 Shortcut URL
+    console.log('\n📱 測試 4: 構建 Shortcut URL');
+    const shortcutUrl = buildShortcutUrl(testFileId);
+    console.log('✅ Shortcut URL 構建成功');
+    console.log('完整 URL:', shortcutUrl);
+    
+    // 測試 5: 驗證 URL 格式
+    console.log('\n🔍 測試 5: 驗證 URL 格式');
+    if (!shortcutUrl.startsWith('shortcuts://run-shortcut?')) {
+      console.error('❌ URL 格式錯誤');
+      return { success: false, error: 'URL 格式不正確' };
+    }
+    if (!shortcutUrl.includes('name=')) {
+      console.error('❌ URL 缺少 name 參數');
+      return { success: false, error: 'URL 缺少必要參數' };
+    }
+    if (!shortcutUrl.includes('text=')) {
+      console.error('❌ URL 缺少 text 參數');
+      return { success: false, error: 'URL 缺少必要參數' };
+    }
+    console.log('✅ URL 格式驗證通過');
+    
+    console.log('\n========================================');
+    console.log('🎉 階段 5 步驟 1 測試完成！');
+    console.log('========================================');
+    console.log('📋 測試摘要:');
+    console.log('   - 測試檔案:', testFileName);
+    console.log('   - 檔案 ID:', testFileId);
+    console.log('   - Shortcut URL 長度:', shortcutUrl.length, '字元');
+    console.log('========================================');
+    
+    return {
+      success: true,
+      testFileId: testFileId,
+      testFileName: testFileName,
+      shortcutUrl: shortcutUrl
+    };
+    
+  } catch (error) {
+    console.error('❌ 測試失敗:', error);
+    console.error('錯誤詳情:', error.stack);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 🧪 測試階段 5 步驟 2：LINE 按鈕功能
+ * 保留供未來測試使用
+ */
+function testPhase5Step2() {
+  console.log('========================================');
+  console.log('🧪 階段 5 步驟 2 測試開始');
+  console.log('========================================');
+  
+  try {
+    // 測試用戶 ID
+    const testUserId = 'Ue75403f8c9bfc49141bf88072646eacf';
+    
+    console.log('\n👤 測試對象:', testUserId);
+    
+    // 測試 1: 找到測試用 PDF
+    console.log('\n📄 測試 1: 從生成文件資料夾找測試 PDF');
+    const generatedFolderId = CONFIG.PHASE5.TEMPLATE.GENERATED_FOLDER_ID;
+    const folder = DriveApp.getFolderById(generatedFolderId);
+    const files = folder.getFilesByType(MimeType.PDF);
+    
+    if (!files.hasNext()) {
+      console.error('❌ 資料夾內找不到 PDF 檔案');
+      return { success: false, error: '找不到測試 PDF' };
+    }
+    
+    const testPdf = files.next();
+    const testFileId = testPdf.getId();
+    const testFileName = testPdf.getName();
+    
+    console.log('找到測試 PDF:', testFileName);
+    console.log('檔案 ID:', testFileId);
+    console.log('✅ 測試 PDF 找到');
+    
+    // 測試 2: 設定檔案公開（確保可下載）
+    console.log('\n🔓 測試 2: 確保檔案為公開');
+    const publicSuccess = setFilePublic(testFileId);
+    if (!publicSuccess) {
+      return { success: false, error: '設定公開失敗' };
+    }
+    console.log('✅ 檔案權限確認');
+    
+    // 測試 3: 構建 Shortcut URL
+    console.log('\n📱 測試 3: 構建 Shortcut URL');
+    const shortcutUrl = buildShortcutUrl(testFileId);
+    console.log('Shortcut URL:', shortcutUrl);
+    console.log('✅ URL 構建成功');
+    
+    // 測試 4: 發送 LINE 連結訊息
+    console.log('\n📤 測試 4: 發送 LINE 連結訊息');
+    const sendSuccess = sendShortcutMessage(testUserId, shortcutUrl);
+    
+    if (!sendSuccess) {
+      console.error('❌ LINE 訊息發送失敗');
+      return { success: false, error: 'LINE 訊息發送失敗' };
+    }
+    
+    console.log('✅ LINE 訊息發送成功');
+    
+    console.log('\n========================================');
+    console.log('🎉 階段 5 步驟 2 測試完成！');
+    console.log('========================================');
+    console.log('📋 測試摘要:');
+    console.log('   - 接收對象:', testUserId);
+    console.log('   - 測試檔案:', testFileName);
+    console.log('   - 檔案 ID:', testFileId);
+    console.log('   - LINE 訊息:', '已發送純文字訊息（含 Shortcut 連結）');
+    console.log('\n📱 請到 LINE 確認:');
+    console.log('   1. 是否收到訊息');
+    console.log('   2. 訊息包含: ✅ 申請表已準備好！');
+    console.log('   3. Shortcut URL 是否為可點擊連結');
+    console.log('   4. 點擊連結是否能啟動 Shortcut app');
+    console.log('========================================');
+    
+    return {
+      success: true,
+      testUserId: testUserId,
+      testFileId: testFileId,
+      testFileName: testFileName,
+      shortcutUrl: shortcutUrl,
+      lineSent: true
+    };
+    
+  } catch (error) {
+    console.error('❌ 測試失敗:', error);
+    console.error('錯誤詳情:', error.stack);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
