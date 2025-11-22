@@ -519,10 +519,6 @@ function confirmApplication(userId) {
   // 最終確認提示
   const confirmMessage = `📋 最終確認：
 
-📅 申請月份：${state.targetMonth.display}
-📍 申請日期：${dateDisplay}
-🎬 表演影片：${videoDisplay}
-
 ✅ 確定請說「好」開始申請
 ❌ 還要修改請說「改日期」或「改影片」`;
   
