@@ -391,7 +391,7 @@ function sendShortcutMessage(to, shortcutUrl) {
       messages: [
         {
           type: 'text',
-          text: '申請表已準備好，請點擊下方連結取得申請書：'
+          text: '老媽我把申請表準備好了，請點下方網址打開網頁：'
         },
         {
           type: 'text',

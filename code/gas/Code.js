@@ -378,7 +378,7 @@ function handleStateBasedInput(userState, text, userId, event) {
   switch (userState.currentStep) {
     case 'waiting_confirmation':
       // 等待確認狀態
-      if (['對', '好', '是', '確認', '可以', '沒錯', '正確'].includes(normalizedText)) {
+      if (['對', '好', '是', '確認', '可以', '沒錯', '正確', 'ok'].includes(normalizedText)) {
         // 確認 - 執行待處理的意圖
         clearUserState(userId);
         return handleHighConfidenceIntent({
@@ -395,7 +395,7 @@ function handleStateBasedInput(userState, text, userId, event) {
     
     case 'application_started':
       // 已開始申請，等待確認或修改
-      if (['對', '好', '確認', '可以'].includes(normalizedText)) {
+      if (['對', '好', '確認', '可以', 'ok'].includes(normalizedText)) {
         // 簡化流程：跳過最終確認，直接執行申請
         console.log('✅ 用戶確認，直接執行申請（跳過最終確認）');
         const groupId = event.source && event.source.type === 'group' ? event.source.groupId : null;
