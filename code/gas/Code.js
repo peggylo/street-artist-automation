@@ -297,7 +297,7 @@ function handleApplicationIntent(userId) {
 
 OK請說：「好」，
 
-想改請說：「改日期」或「改影片」。`;
+想改請說：「改日期」，或「改影片」。`;
 }
 
 /**
@@ -405,7 +405,7 @@ function handleStateBasedInput(userState, text, userId, event) {
       } else if (normalizedText.includes('改影片') || normalizedText.includes('修改影片')) {
         return startVideoModification(userId);
       } else if (normalizedText.includes('修改') || normalizedText.includes('改')) {
-        return '要修改什麼？\n\n請說「改日期」或「改影片」';
+        return '要修改什麼？\n\n請說「改日期」，或「改影片」';
       }
       break;
     
@@ -420,7 +420,7 @@ function handleStateBasedInput(userState, text, userId, event) {
         const state = getUserState(userId);
         state.currentStep = 'application_started';
         setUserState(userId, state);
-        return '已取消日期修改。\n\n' + getApplicationSummary(state) + '\n\nOK請說：「好」開始申請，\n想改請說：「改日期」或「改影片」。';
+        return '已取消日期修改。\n\n' + getApplicationSummary(state) + '\n\nOK請說：「好」，\n想改請說：「改日期」，或「改影片」。';
       }
       // 繼續選擇日期
       else {
@@ -439,7 +439,7 @@ function handleStateBasedInput(userState, text, userId, event) {
         delete state.pendingOriginalInput;
         setUserState(userId, state);
         
-        return getApplicationSummary(state) + '\n\nOK請說：「好」開始申請，\n想改請說：「改日期」或「改影片」。';
+        return getApplicationSummary(state) + '\n\nOK請說：「好」，\n想改請說：「改日期」，或「改影片」。';
       } else {
         // 不正確，回到日期選擇狀態重新輸入
         const state = getUserState(userId);
@@ -527,7 +527,7 @@ function confirmApplication(userId) {
   const confirmMessage = `最終確認：
 
 確定請說「好」開始申請
-還要修改請說「改日期」或「改影片」`;
+還要修改請說「改日期」，或「改影片」`;
   
   // 設定狀態為等待最終確認
   state.currentStep = 'final_confirmation';
@@ -545,6 +545,11 @@ function executeFinalApplication(userId, groupId = null) {
   console.log('🚀 開始執行最終申請');
   console.log('📋 userId:', userId);
   console.log('📋 groupId:', groupId);
+  
+  // ✨ 新增：立即發送確認訊息（用 pushMessage 主動發送）
+  const targetId = groupId || userId;
+  pushMessage(targetId, '收到，我正在幫老媽填申請表了，請稍等一分鐘，完成後叫老媽。');
+  console.log('✅ 已發送確認訊息給:', targetId);
   
   const state = getUserState(userId);
   console.log('📊 用戶狀態:', JSON.stringify(state, null, 2));
@@ -676,7 +681,7 @@ function startVideoModification(userId) {
   state.useDefaultVideo = false;
   setUserState(userId, state);
   
-  return `請直接傳送影片檔案`;
+  return `請老媽傳影片給我，影片上傳大約需1到2分鐘，請耐心等待。`;
 }
 
 /**
@@ -797,8 +802,8 @@ function handleVideoMessage(event) {
 
 ${getApplicationSummary(state)}
 
-OK請說：「好」開始申請，
-想改請說：「改日期」或「改影片」。`;
+OK請說：「好」，
+想改請說：「改日期」，或「改影片」。`;
     
     replyMessage(replyToken, response);
     
@@ -963,7 +968,7 @@ function finishDateSelection(userId) {
   state.context = 'application';
   setUserState(userId, state);
   
-  return getApplicationSummary(state) + '\n\nOK請說：「好」開始申請，\n想改請說：「改日期」或「改影片」。';
+  return getApplicationSummary(state) + '\n\nOK請說：「好」，\n想改請說：「改日期」，或「改影片」。';
 }
 
 /**
@@ -1192,7 +1197,7 @@ function handleVideoUploadError(errorType, errorMessage, userId) {
 
 ${getApplicationSummary(state)}
 
-OK請說：「好」開始申請，
+OK請說：「好」，
 重新上傳請說：「改影片」。`;
     
     return response;
