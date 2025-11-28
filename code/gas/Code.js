@@ -798,6 +798,15 @@ function handleVideoMessage(event) {
     state.context = 'application';
     setUserState(userId, state);
     
+    // ✨ 新增：更新「最新影片」設定到 PropertiesService
+    try {
+      PropertiesService.getScriptProperties()
+        .setProperty('LATEST_VIDEO_URL', uploadResult.fileUrl);
+      console.log('✅ 已更新常用影片 URL:', uploadResult.fileUrl);
+    } catch (propError) {
+      console.warn('⚠️ 更新常用影片 URL 失敗（不影響本次申請）:', propError);
+    }
+    
     const response = `影片上傳成功！
 
 ${getApplicationSummary(state)}
@@ -1499,7 +1508,18 @@ function prepareApplicationData(state) {
   
   if (state.useDefaultVideo) {
     videoSource = '常用影片';
-    video_url = CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_URL;
+    
+    // ✨ 修改：優先使用最新上傳的影片
+    try {
+      const latestVideoUrl = PropertiesService.getScriptProperties()
+        .getProperty('LATEST_VIDEO_URL');
+      
+      video_url = latestVideoUrl || CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_URL;
+      console.log('📹 使用影片 URL:', latestVideoUrl ? '最新上傳' : '預設影片', video_url);
+    } catch (propError) {
+      console.warn('⚠️ 讀取最新影片 URL 失敗，使用預設影片:', propError);
+      video_url = CONFIG.PHASE3.GOOGLE_DRIVE.DEFAULT_VIDEO_URL;
+    }
   } else {
     videoSource = '新上傳';
     video_url = state.newVideoUrl || '';
