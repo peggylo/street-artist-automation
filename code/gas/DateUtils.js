@@ -104,7 +104,7 @@ function getSaturdays(year, month, count = 0) {
       saturdays.push({
         date: day,
         day: '六',
-        display: `${month}/${day}(六)`,
+        display: `${month}月${day}日週六`,
         fullDate: date
       });
     }
@@ -135,7 +135,7 @@ function getSundays(year, month, count = 0) {
       sundays.push({
         date: day,
         day: '日',
-        display: `${month}/${day}(日)`,
+        display: `${month}月${day}日週日`,
         fullDate: date
       });
     }
@@ -215,7 +215,7 @@ function parseDateSelectionEnhanced(userInput, targetMonth, targetYear) {
           selectedDates.push({
             date: day,
             day: dayOfWeek,
-            display: `${targetMonth}/${day}(${dayOfWeek})`,
+            display: `${targetMonth}月${day}日週${dayOfWeek}`,
             fullDate: date
           });
         } else if (day > 31) {

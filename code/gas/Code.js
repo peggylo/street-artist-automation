@@ -214,7 +214,7 @@ function handleTextMessageWithAI(event, text) {
       responseMessage = `🤔 AI理解結果\n\n原始輸入：「${text}」\n可能是：「${analysis.correctedText}」\n信心度：${(analysis.confidence * 100).toFixed(0)}%\n\n請確認我的理解是否正確`;
     } else {
       // 低信心度：請用戶重新表達
-      responseMessage = `😕 我不太確定您的意思\n\n原始輸入：「${text}」\n信心度：${(analysis.confidence * 100).toFixed(0)}%\n\n請用更清楚的方式表達，例如：\n• 「申請」\n• 「測試」\n• 「幫助」`;
+      responseMessage = `我聽不太懂，請再說一次，要開始申請請說「我要申請」這四個字\n\n原始輸入：「${text}」\n信心度：${(analysis.confidence * 100).toFixed(0)}%`;
     }
     
     // 回覆訊息
@@ -243,7 +243,7 @@ function handleHighConfidenceIntent(analysis, userId, originalText) {
       return handleHelpIntent();
     
     case 'greeting':
-      return '您好！我是松菸申請助手 🎭\n\n請說「申請」開始申請流程';
+      return 'Hi老媽，我來幫你申請松菸場地，請說：「我要申請！」這四個字開始吧！';
     
     case 'date':
       // 如果在等待日期選擇狀態
@@ -274,7 +274,7 @@ function handleApplicationIntent(userId) {
   // 檢查申請時間窗口
   const windowCheck = checkApplicationWindow();
   if (!windowCheck.isOpen) {
-    return `⏰ 現在不是申請時間\n\n${windowCheck.message}`;
+    return `現在不是申請時間\n\n${windowCheck.message}`;
   }
   
   // 取得預設申請資訊（預設下個月）
@@ -291,13 +291,13 @@ function handleApplicationIntent(userId) {
   });
   
   // 回覆預設選項
-  return `📅 申請 ${targetMonth.display} 份場地
+  return `老媽，現在可申請${targetMonth.display}場地。
 
-📍 預設日期：${defaultDates.display}
-🎬 影片：使用常用影片
+我會用預設影片，幫您登記${defaultDates.display}。
 
-✅ 確認請說「好」或「對」
-📝 修改請說「改日期」或「改影片」`;
+OK請說：「好」，
+
+想改請說：「改日期」或「改影片」。`;
 }
 
 /**
@@ -323,19 +323,19 @@ function handleTestIntent(userId) {
  * 處理幫助意圖
  */
 function handleHelpIntent() {
-  return `🤖 松菸申請助手使用說明
+  return `松菸申請助手使用說明
 
-📌 主要功能：
+主要功能：
 • 申請松山文創園區街頭藝人場地
 • 自動計算可申請日期
 • 處理申請文件
 
-💬 指令說明：
+指令說明：
 • 「申請」- 開始申請流程
 • 「測試」- 測試系統狀態
 • 「幫助」- 顯示此說明
 
-📅 申請規則：
+申請規則：
 • 每月 1-15 日及 20-31 日可申請
 • 1-15日申請下個月，20-31日申請下下個月
 • 預設選擇前 3 個週六
@@ -396,7 +396,10 @@ function handleStateBasedInput(userState, text, userId, event) {
     case 'application_started':
       // 已開始申請，等待確認或修改
       if (['對', '好', '確認', '可以'].includes(normalizedText)) {
-        return confirmApplication(userId);
+        // 簡化流程：跳過最終確認，直接執行申請
+        console.log('✅ 用戶確認，直接執行申請（跳過最終確認）');
+        const groupId = event.source && event.source.type === 'group' ? event.source.groupId : null;
+        return executeFinalApplication(userId, groupId);
       } else if (normalizedText.includes('改日期') || normalizedText.includes('修改日期')) {
         return startDateModification(userId);
       } else if (normalizedText.includes('改影片') || normalizedText.includes('修改影片')) {
@@ -417,7 +420,7 @@ function handleStateBasedInput(userState, text, userId, event) {
         const state = getUserState(userId);
         state.currentStep = 'application_started';
         setUserState(userId, state);
-        return '已取消日期修改\n\n' + getApplicationSummary(state);
+        return '已取消日期修改。\n\n' + getApplicationSummary(state) + '\n\nOK請說：「好」開始申請，\n想改請說：「改日期」或「改影片」。';
       }
       // 繼續選擇日期
       else {
@@ -436,7 +439,7 @@ function handleStateBasedInput(userState, text, userId, event) {
         delete state.pendingOriginalInput;
         setUserState(userId, state);
         
-        return getApplicationSummary(state) + '\n\n✅ 確認請說「好」\n📝 繼續修改請說「改日期」或「改影片」';
+        return getApplicationSummary(state) + '\n\nOK請說：「好」開始申請，\n想改請說：「改日期」或「改影片」。';
       } else {
         // 不正確，回到日期選擇狀態重新輸入
         const state = getUserState(userId);
@@ -455,13 +458,15 @@ function handleStateBasedInput(userState, text, userId, event) {
         const state = getUserState(userId);
         state.currentStep = 'application_started';
         setUserState(userId, state);
-        return '已取消影片修改\n\n' + getApplicationSummary(state);
+        return '已取消影片修改。\n\n' + getApplicationSummary(state) + '\n\nOK請說：「好」開始申請，\n想改請說：「改日期」或「改影片」。';
       }
       return '請直接傳送影片檔案，或說「取消」放棄修改';
     
     case 'final_confirmation':
       // 最終確認狀態
-      console.log('📋 處理最終確認狀態，輸入:', normalizedText);
+      // @deprecated 2025-11-26 - 已簡化流程，此狀態不再使用
+      // 保留此處理邏輯以防需要回復舊流程
+      console.log('📋 處理最終確認狀態（已棄用），輸入:', normalizedText);
       if (['對', '好', '確定', '確認', '可以', 'ok'].includes(normalizedText)) {
         console.log('✅ 用戶確認，開始執行最終申請');
         // Phase 6: 取得 groupId（如果有）
@@ -506,6 +511,8 @@ function handleSimpleKeywords(text, userId) {
 
 /**
  * 確認申請（最終確認）
+ * @deprecated 2025-11-26 - 已簡化流程，跳過最終確認步驟
+ * 保留此函數以防需要回復舊流程
  */
 function confirmApplication(userId) {
   const state = getUserState(userId);
@@ -514,13 +521,13 @@ function confirmApplication(userId) {
   }
   
   const dateDisplay = state.selectedDates.map(d => d.display).join('、');
-  const videoDisplay = state.useDefaultVideo ? '常用影片' : '新上傳影片';
+  const videoDisplay = state.useDefaultVideo ? '預設影片' : '新上傳影片';
   
   // 最終確認提示
-  const confirmMessage = `📋 最終確認：
+  const confirmMessage = `最終確認：
 
-✅ 確定請說「好」開始申請
-❌ 還要修改請說「改日期」或「改影片」`;
+確定請說「好」開始申請
+還要修改請說「改日期」或「改影片」`;
   
   // 設定狀態為等待最終確認
   state.currentStep = 'final_confirmation';
@@ -548,7 +555,7 @@ function executeFinalApplication(userId, groupId = null) {
   }
   
   const dateDisplay = state.selectedDates.map(d => d.display).join('、');
-  const videoDisplay = state.useDefaultVideo ? '常用影片' : '新上傳影片';
+  const videoDisplay = state.useDefaultVideo ? '預設影片' : '新上傳影片';
   
   console.log('📅 日期顯示:', dateDisplay);
   console.log('🎬 影片顯示:', videoDisplay);
@@ -645,12 +652,13 @@ function startDateModification(userId) {
   state.context = 'date_selection';
   setUserState(userId, state);
   
-  return `📅 ${state.targetMonth.display} 可選日期：
+  return `${state.targetMonth.display}可選日期，全部念給老媽聽：
+${allDates.saturdayDisplay}。
 
-週六：${allDates.saturdayDisplay}
-週日：${allDates.sundayDisplay}
+還有：
+${allDates.sundayDisplay}。
 
-請告訴我您要哪幾天（例如：11號、12號、26號）`;
+請問要選哪三天，請說日期就好，例如老媽可以說：「1號、8號、15號」。`;
 }
 
 /**
@@ -705,12 +713,12 @@ function handleDateSelection(userId, userInput) {
     state.selectedDates = directParseResult.dates;
     setUserState(userId, state);
     
-    return `✅ 日期已更新！
+    return `日期已更新！
 
-📍 目前選擇：${directParseResult.dates.map(d => d.display).join('、')}
+目前選擇：${directParseResult.dates.map(d => d.display).join('、')}
 
-🔄 還要改嗎？直接說新的日期
-✅ 滿意請說「好」完成選擇`;
+還要改嗎？直接說新的日期
+滿意請說「好」完成選擇`;
   }
   
   // 完全無法理解，提供降級幫助
@@ -785,12 +793,12 @@ function handleVideoMessage(event) {
     state.context = 'application';
     setUserState(userId, state);
     
-    const response = `✅ 影片上傳成功！
+    const response = `影片上傳成功！
 
 ${getApplicationSummary(state)}
 
-✅ 確認請說「好」
-📝 繼續修改請說「改日期」或「改影片」`;
+OK請說：「好」開始申請，
+想改請說：「改日期」或「改影片」。`;
     
     replyMessage(replyToken, response);
     
@@ -810,19 +818,9 @@ function handleFollow(event) {
   
   console.log('👋 新用戶加入:', userId);
   
-  const welcomeMessage = `歡迎使用松菸申請助手！🎭
+  const welcomeMessage = `您好！我是松菸申請助手。
 
-我可以協助您：
-• 申請松山文創園區街頭藝人場地
-• 自動計算可申請日期
-• 處理申請文件
-
-📌 使用方式：
-說「申請」開始申請流程
-說「測試」測試系統狀態
-說「幫助」查看使用說明
-
-目前處於 Phase 3 開發階段`;
+請說「我要申請」這四個字開始吧！`;
   
   replyMessage(replyToken, welcomeMessage);
 }
@@ -965,7 +963,7 @@ function finishDateSelection(userId) {
   state.context = 'application';
   setUserState(userId, state);
   
-  return getApplicationSummary(state) + '\n\n✅ 確認請說「好」\n📝 繼續修改請說「改日期」或「改影片」';
+  return getApplicationSummary(state) + '\n\nOK請說：「好」開始申請，\n想改請說：「改日期」或「改影片」。';
 }
 
 /**
@@ -973,12 +971,9 @@ function finishDateSelection(userId) {
  */
 function getApplicationSummary(state) {
   const dateDisplay = state.selectedDates.map(d => d.display).join('、');
-  const videoDisplay = state.useDefaultVideo ? '常用影片' : '新上傳影片';
+  const videoText = state.useDefaultVideo ? '預設影片' : '新上傳影片';
   
-  return `📋 目前申請資訊：
-📅 月份：${state.targetMonth.display}
-📍 日期：${dateDisplay}
-🎬 影片：${videoDisplay}`;
+  return `我們將登記：${dateDisplay}，並會用${videoText}。`;
 }
 
 /**
@@ -993,12 +988,11 @@ function showDateConfirmation(userId, originalInput, aiUnderstood, parsedDates) 
   state.currentStep = 'confirming_dates';
   setUserState(userId, state);
   
-  return `🤖 我理解您要「${aiUnderstood}」
+  return `我聽到您選：${parsedDates.map(d => d.display).join('、')}
 
-📍 選擇日期：${parsedDates.map(d => d.display).join('、')}
+正確請說：「對」。
 
-✅ 正確請說「對」或「好」
-❌ 錯誤請重新說一次您要的日期`;
+若我有聽錯，請重新說一遍您要的三個日期，例如老媽可以說：1號、8號、15號。`;
 }
 
 /**
@@ -1192,14 +1186,14 @@ function handleVideoUploadError(errorType, errorMessage, userId) {
     state.context = 'application';
     setUserState(userId, state);
     
-    const response = `❌ ${errorMessage}
+    const response = `${errorMessage}
 
-💡 目前先使用常用影片繼續申請
+目前先使用預設影片繼續申請。
 
 ${getApplicationSummary(state)}
 
-✅ 確認請說「好」
-📝 重新上傳請說「改影片」`;
+OK請說：「好」開始申請，
+重新上傳請說：「改影片」。`;
     
     return response;
   }
@@ -1320,7 +1314,9 @@ function handleTextMessageWithState(event, text) {
       replyMessage(replyToken, response);
     } else {
       // 低信心度：請重新表達
-      const response = `😕 不太確定您的意思\n\n請用更清楚的方式表達，例如：\n• 「申請」開始申請\n• 「幫助」查看說明`;
+      const response = `請老媽說：
+我要申請！
+這四個字開始`;
       replyMessage(replyToken, response);
     }
     
@@ -1331,10 +1327,10 @@ function handleTextMessageWithState(event, text) {
     console.error('📋 錯誤訊息:', error.message);
     
     // 通知用戶發生錯誤
-    replyMessage(replyToken, `⚠️ Phase 3 系統異常，已自動切換到備用模式
+    replyMessage(replyToken, `Phase 3 系統異常，已自動切換到備用模式
     
-🔧 錯誤類型：${error.name}
-📝 錯誤訊息：${error.message}
+錯誤類型：${error.name}
+錯誤訊息：${error.message}
 
 請截圖此訊息並聯繫管理員`);
   }
@@ -1445,42 +1441,45 @@ function recordApplicationToSheets(userId, applicationData) {
  */
 function formatDatesForSheet(selectedDates) {
   return selectedDates.map(date => {
-    // 將 display 格式 "10/4(六)" 轉換為完整日期 "2024/10/4"
-    const dateParts = date.display.match(/(\d+)\/(\d+)/);
-    if (dateParts) {
-      const month = dateParts[1];
-      const day = dateParts[2];
-      
-      // 處理 fullDate 可能是字串的情況（Cache Service 序列化問題）
-      // 因為 Google Apps Script 的 Cache Service 會把 Date 物件轉成字串，所以需要特別處理
-      let year;
-      try {
-        if (date.fullDate) {
-          if (typeof date.fullDate === 'string') {
-            // 如果是字串，轉換為 Date 物件
-            const fullDate = new Date(date.fullDate);
-            year = fullDate.getFullYear();
-          } else {
-            // 如果是 Date 物件
-            year = date.fullDate.getFullYear();
-          }
-        } else {
-          // 如果沒有 fullDate，使用當前年份或下一年
-          const now = new Date();
-          year = now.getFullYear();
-          if (parseInt(month) < now.getMonth() + 1) {
-            year += 1; // 如果月份小於當前月份，假設是下一年
-          }
-        }
-      } catch (error) {
-        console.error('❌ 日期解析錯誤:', error);
-        // 降級：使用當前年份
-        year = new Date().getFullYear();
+    try {
+      // 優先使用 fullDate 物件（不依賴 display 格式）
+      if (date.fullDate) {
+        // 處理 fullDate 可能是字串的情況（Cache Service 序列化問題）
+        const dateObj = typeof date.fullDate === 'string' 
+          ? new Date(date.fullDate) 
+          : date.fullDate;
+        
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth() + 1;
+        const day = dateObj.getDate();
+        
+        return `${year}/${month}/${day}`;
       }
       
-      return `${year}/${month}/${day}`;
+      // 降級方案：從完整格式 display 提取（格式：1月4日週六）
+      const dateParts = date.display.match(/(\d+)月(\d+)日/);
+      if (dateParts) {
+        const month = dateParts[1];
+        const day = dateParts[2];
+        
+        // 推測年份
+        const now = new Date();
+        let year = now.getFullYear();
+        if (parseInt(month) < now.getMonth() + 1) {
+          year += 1; // 如果月份小於當前月份，假設是下一年
+        }
+        
+        return `${year}/${month}/${day}`;
+      }
+      
+      // 最後降級：返回原始 display
+      console.warn('⚠️ 無法解析日期格式，使用原始 display:', date.display);
+      return date.display;
+      
+    } catch (error) {
+      console.error('❌ 日期格式化錯誤:', error, date);
+      return date.display;
     }
-    return date.display;
   }).join(',');
 }
 
