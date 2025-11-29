@@ -32,3 +32,6 @@ env/
 .venv/
 analyze_website.py
 # website_analysis_result.json - 需要部署到 Cloud Run
+
+# Archive 資料夾（Phase 6 未使用的檔案）
+archive/

@@ -2,7 +2,7 @@
 
 ## 📋 背景
 
-**問題**：Cloud Run 無頭模式在松菸網站 100% 觸發 reCAPTCHA 圖片驗證，Vision API 方案複雜且不穩定。
+**問題**：Cloud Run 無頭模式在申請網站 100% 觸發 reCAPTCHA 圖片驗證，Vision API 方案複雜且不穩定。
 
 **解決方案**：iOS Shortcut + Safari Bookmarklet + 人工輔助
 
@@ -13,15 +13,15 @@
 ### Shortcut 負責（自動）
 1. 從 Google Drive 下載申請 PDF 到 iCloud Drive
 2. 從 Google Drive 下載街頭藝人證到 iCloud Drive（證照 URL 固定在 Shortcut 中）
-3. 開啟松菸網站首頁
-4. 語音提示媽媽點擊書籤
+3. 開啟申請網站首頁
+4. 語音提示使用者點擊書籤
 
 ### Bookmarklet 負責（點兩次）
 1. **第一次點擊**：自動導航到街頭藝人申請表單頁
 2. **第二次點擊**：自動填寫姓名、手機、信箱、勾選同意條款
 
-### 媽媽負責（VoiceOver 操作）
-1. 點擊「松菸申請」書籤兩次
+### 使用者負責（VoiceOver 操作）
+1. 點擊「場地申請」書籤兩次
 2. 上傳 PDF 和證照
 3. 勾選 reCAPTCHA
 4. 送出
@@ -39,13 +39,13 @@ GAS + Cloud Run 生成 PDF
   ↓
 LINE 發送 Shortcut 按鈕
   ↓
-媽媽點擊 → Shortcut 下載檔案 + 開啟網站
+使用者點擊 → Shortcut 下載檔案 + 開啟網站
   ↓
-媽媽點擊書籤 (1) → 進入表單頁
+使用者點擊書籤 (1) → 進入表單頁
   ↓
-媽媽點擊書籤 (2) → 自動填表
+使用者點擊書籤 (2) → 自動填表
   ↓
-媽媽上傳檔案 + reCAPTCHA + 送出
+使用者上傳檔案 + reCAPTCHA + 送出
 ```
 
 ---
@@ -53,14 +53,14 @@ LINE 發送 Shortcut 按鈕
 ## 📱 Shortcut 實作（簡化版）
 
 ### Shortcut 名稱
-`松菸申請`
+`場地申請`
 
 ### 核心動作（約 10-12 個）
 1. **取得捷徑輸入**：從 LINE 接收 PDF URL
 2-5. 下載 PDF 到 iCloud Drive（URL 動態，手動設定檔名避免中文亂碼）
 6-9. 下載證照到 iCloud Drive（URL 固定，已寫入 Shortcut）
-10. 開啟松菸網站首頁
-11-12. 語音提示「請點擊松菸申請書籤」
+10. 開啟申請網站首頁
+11-12. 語音提示「請點擊場地申請書籤」
 
 **重點**：
 - 證照 URL **不由 LINE 傳入**，直接寫死在 Shortcut 中
@@ -107,7 +107,7 @@ if (在表單頁) {
 - 函數：`sendShortcutLinkToLine()`
 - 只傳送 PDF URL 給 Shortcut（證照 Google Drive URL 已固定在 Shortcut 中）
 - LINE Quick Reply 按鈕：「🚀 上網填表」
-- URI：`shortcuts://run-shortcut?name=松菸申請&input=text&text={pdf_url}`
+- URI：`shortcuts://run-shortcut?name=場地申請&input=text&text={pdf_url}`
 - **證照設定**：需一次性將證照檔案設為公開，URL 固定後寫入 Shortcut
 
 ---
@@ -128,7 +128,7 @@ if (在表單頁) {
 ### 決策 3：智能書籤（單一書籤兩個功能）
 - 自動判斷當前頁面（首頁 vs 表單頁）
 - 執行對應操作（導航 vs 填表）
-- 媽媽只需記住一個書籤
+- 使用者只需記住一個書籤
 
 ---
 
@@ -149,7 +149,7 @@ if (在表單頁) {
 
 ### 階段 2：網站開啟測試 ✅
 - 新增「開啟 URL」動作
-- Safari 自動開啟松菸網站首頁
+- Safari 自動開啟申請網站首頁
 - 語音提示已開啟網站
 - 教學文件：`shortcut-stage2-tutorial.md`
 - **重要發現**：iOS Shortcut 的 JavaScript 動作不穩定 → 改用 Bookmarklet
@@ -232,7 +232,7 @@ if (在表單頁) {
 - **問題**：VoiceOver 導航到「確認送出」按鈕較困難
 - **方案**：第二次點擊書籤時自動點擊送出按鈕
 - **特性**：
-  - Optional 功能，媽媽可選擇使用或用 VoiceOver 手動送出
+  - Optional 功能，使用者可選擇使用或用 VoiceOver 手動送出
   - 送出前檢查：兩個檔案已上傳 + reCAPTCHA 已勾選
   - 檢查失敗時語音提醒缺少項目
 - **判斷邏輯**：姓名欄位已有值 → 執行自動送出（含檢查）
@@ -251,7 +251,7 @@ if (在表單頁) {
 - **檔名問題**：Google Drive 中文檔名會產生 UTF-8 編碼亂碼，Shortcut 需手動重建檔名（使用當前日期時間）
 
 ### 網站改版
-- 松菸網站改版時需更新 Bookmarklet 選擇器
+- 申請網站改版時需更新 Bookmarklet 選擇器
 - Bookmarklet 可獨立測試和更新（不需改 Shortcut）
 
 ### Bookmarklet 維護

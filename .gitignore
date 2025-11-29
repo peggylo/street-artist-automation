@@ -27,6 +27,9 @@ templates/*.doc
 songshan-bookmarklet.js
 songshan-bookmarklet-minified.txt
 
+# Shortcut（包含個資）
+code/shortcut/松菸申請.shortcut
+
 # 申請相關資料夾（包含個資和生成文件）
 系統記錄/
 申請截圖/
