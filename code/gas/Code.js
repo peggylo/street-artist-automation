@@ -1878,6 +1878,15 @@ function copyWordTemplate(applicationData) {
  * 
  * 關鍵：此函數必須實際調用需要授權的 API（Drive/Sheets），
  * 才能真正「喚醒」授權，防止授權過期。
+ * 
+ * ⚠️ TODO: 2025-11-29 發現授權過期問題
+ * 現象：LINE Webhook 返回 403 Forbidden，手動打開部署 URL 時要求重新授權
+ * 疑問：dailyKeepAlive 有正常執行（11/28 晚上 8:29），但授權仍然過期
+ * 待確認：
+ *   1. 時間觸發器執行的 dailyKeepAlive 是否真的能維持授權？
+ *   2. 是否需要手動執行一次才能刷新授權？
+ *   3. GAS 部署授權與 API 授權是否為不同機制？
+ * 暫時解法：手動打開部署 URL 完成授權流程
  */
 function dailyKeepAlive() {
   try {
