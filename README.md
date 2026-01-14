@@ -187,7 +187,6 @@ Safari Bookmarklet Auto-Fill
 User Completes Application
 ```
 
-💡 **All data storage uses Google Drive API. The system itself is stateless.**
 
 ---
 
